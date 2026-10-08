@@ -2,7 +2,7 @@
 
 Data: 8 de outubro de 2026 (UTC).
 
-- 57 testes automatizados passaram em ambiente local: 18 da pesquisa/API, 12 da configuração SSL e 27 do agente comercial.
+- 79 testes automatizados passaram no GitHub Actions: 18 da pesquisa/API, 12 da configuração SSL, 27 do agente comercial e 22 do atendimento.
 - PEM separado e combinado foram validados com certificados fictícios gerados durante os testes. Chaves incompatíveis e valores Base64 inválidos foram recusados antes da conexão.
 - A conversão para variáveis de ambiente, as permissões privadas, a limpeza após falha e a passagem dos parâmetros SSL ao driver foram verificadas.
 - Uma busca real de oficinas, restaurantes, beleza e lojas na área de Campinas retornou 100 cadastros do OpenStreetMap.
@@ -24,4 +24,4 @@ A API publicada em `https://atendeai-co.squareweb.app` iniciou com os certificad
 
 O fluxo comercial foi testado localmente com SQLite e HTTP simulado. O esquema PostgreSQL compilou; os testes de concorrência em uma instância real de PostgreSQL e a validação do envio/recebimento com número e credenciais reais da Meta ainda dependem dessa configuração. As chamadas de IA foram simuladas; nenhum consumo pago de IA foi realizado. Nenhuma mensagem real de WhatsApp foi enviada.
 
-O agente 3 acrescenta 21 testes de isolamento de empresas/visitantes, base de respostas, limite de uso de IA, webhooks de suporte, interrupção, retomada pelo cliente e encaminhamento humano. Eles passaram localmente antes da recuperação do código para o GitHub. A suíte completa de 78 verificações passou no GitHub Actions em 8 de outubro de 2026. A demonstração pública acrescenta uma verificação de idempotência e ausência de IA paga; a nova suíte de 79 testes deve passar antes da publicação. O widget também passa por verificação de sintaxe JavaScript. Nenhum número real da Meta está configurado nesta sessão.
+O agente 3 tem 22 testes de isolamento de empresas/visitantes, base de respostas, limite de uso de IA, webhooks de suporte, interrupção, retomada pelo cliente, encaminhamento humano e demonstração sem IA paga. A suíte completa de 79 testes passou no GitHub Actions em 8 de outubro de 2026, junto da verificação de sintaxe do widget e geração do esquema PostgreSQL. Nenhum número real da Meta foi configurado nesta sessão.
