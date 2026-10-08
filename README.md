@@ -1,4 +1,4 @@
-# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.5
+# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.6
 
 Pesquisa e prospecção são ferramentas internas da AtendeAI; as empresas contratantes recebem o atendimento do sistema 3. Consulte [PRODUTO.md](PRODUTO.md) para o fluxo completo, confirmação de encaminhamento e mensagens ignoradas.
 

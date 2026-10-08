@@ -133,7 +133,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
                 engine.dispose()
                 ssl_files.close()
 
-    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.5.5", lifespan=lifespan,
+    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.5.6", lifespan=lifespan,
                   description="Pesquisa em São Paulo, conversa comercial e suporte por empresa via site e WhatsApp oficial. O painel está em /painel. Use Authorize com ADMIN_API_KEY nas rotas administrativas; visitantes usam tokens próprios.")
     app.state.settings, app.state.engine, app.state.sessions = settings, engine, sessions
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
@@ -188,7 +188,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
 
     @app.get("/", tags=["Informações"])
     def index():
-        return {"projeto": "AtendeAI", "versao": "0.5.5", "documentacao": "/docs", "painel": "/painel",
+        return {"projeto": "AtendeAI", "versao": "0.5.6", "documentacao": "/docs", "painel": "/painel",
                 "agentes": {"1_pesquisa": "implementado", "2_comercial": "implementado" if settings.whatsapp_ready else "implementado_configuracao_pendente",
                             "3_atendimento": "implementado"},
                 "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}

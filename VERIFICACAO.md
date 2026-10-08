@@ -2,6 +2,12 @@
 
 Data: 8 de outubro de 2026 (UTC).
 
+## Dúvidas do negócio e abuso na versão 0.5.6
+
+A classificação de abuso fica separada da classificação de assunto externo. Quando o modelo tenta ignorar uma consulta reconhecível sobre serviços presentes na própria base, o atendimento oferece a confirmação para chamar um responsável. Mensagens classificadas como abuso continuam sem resposta, inclusive quando mencionam serviços.
+
+117 testes automatizados passaram localmente. Os dois novos casos reproduzem uma consulta de preço classificada indevidamente como externa, seguida de “Ss”, e uma mensagem maliciosa contendo termos do negócio. O fluxo não inventa uma resposta, não abre chamado antes de confirmar e não solicita uma segunda inferência.
+
 ## Filtro de assunto na versão 0.5.5
 
 O teste publicado da 0.5.4 revelou que o modelo respondeu a uma pergunta de geografia fora do negócio. A 0.5.5 acrescenta um filtro antes da inferência para perguntas gerais reconhecíveis, com exceções para temas presentes na base e solicitações comerciais. O modelo também recebe uma ordem explícita de prioridade: ignorar assuntos alheios, oferecer encaminhamento de dúvidas do negócio sem resposta segura e responder com os fatos cadastrados.

@@ -346,8 +346,9 @@ class SupportService:
                     if not current or not current.active or current.title != item["titulo"] or current.content != item["conteudo"]:
                         reason = "base_alterada_durante_resposta"
                         break
-                if decision and decision.acao == "ignorar":
-                    inbound.status, inbound.engine = "ignorada", "fora_de_contexto"
+                if decision and decision.acao in {"ignorar", "bloquear"}:
+                    inbound.status = "ignorada"
+                    inbound.engine = "filtro_abuso_ia" if decision.acao == "bloquear" else "fora_de_contexto"
                     session.commit()
                     return 1
                 if reason and (confirmed or reason in {"precisa_responsavel", "whatsapp_nao_configurado", "janela_resposta_encerrada"}):

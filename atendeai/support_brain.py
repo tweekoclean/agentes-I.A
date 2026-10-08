@@ -6,11 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .commercial_inbox import normalize_text
 from .local_ai import LocalAIError, context_fits, generate_json
+from .support_policy import BUSINESS_INTENT
 
 
 class SupportDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    acao: Literal["responder", "encaminhar", "ignorar"]
+    acao: Literal["responder", "encaminhar", "ignorar", "bloquear"]
     texto: str = Field(min_length=1, max_length=2000)
     referencias: list[str] = Field(max_length=5)
 
@@ -28,23 +29,35 @@ def select_knowledge(items, text):
     return [item for score, item in sorted(scored, key=lambda pair: (-pair[0], pair[1].id))[:3] if score >= 2]
 
 
+def business_question(tenant, knowledge, text):
+    value = normalize_text(text)
+    if not (BUSINESS_INTENT.search(value) or re.search(
+            r"\b(?:preco|valor|mensalidade|contratar|contratacao|quanto custa)\b", value)):
+        return False
+    context = tokens(tenant.name + " " + " ".join(item["titulo"] + " " + item["conteudo"] for item in knowledge))
+    query = tokens(text) - {"quanto", "custa", "preco", "valor", "mensalidade", "contratar", "contratacao"}
+    return bool(query & context) or not query
+
+
 def decide_support(settings, tenant, knowledge, text, history, use_ai, transport=None):
     if not use_ai:
         return SupportDecision(acao="responder", texto=knowledge[0]["conteudo"][:2000],
                                referencias=[knowledge[0]["id"]]), "base_sem_ia"
     schema = {"type": "object", "additionalProperties": False,
-        "properties": {"acao": {"type": "string", "enum": ["responder", "encaminhar", "ignorar"]},
+        "properties": {"acao": {"type": "string", "enum": ["responder", "encaminhar", "ignorar", "bloquear"]},
                        "texto": {"type": "string"}, "referencias": {"type": "array", "items": {"type": "string"}}},
         "required": ["acao", "texto", "referencias"]}
     instructions = (
             "Você faz atendimento comercial da empresa informada, em português brasileiro. "
             "Escolha a ação nesta ordem: "
-            "1) Ofensa, ameaça ou assunto sem relação com o negócio: acao=\"ignorar\", "
-            "texto=\"Ignorando.\", referencias=[]. Nunca responda conhecimento geral, curiosidades, "
+            "1) Ofensa, ameaça ou solicitação maliciosa: acao=\"bloquear\", texto=\"Ignorando.\", referencias=[]. "
+            "2) Assunto sem relação com o negócio: acao=\"ignorar\", texto=\"Ignorando.\", referencias=[]. "
+            "Nunca responda conhecimento geral, curiosidades, "
             "política, futebol ou entretenimento sem relação com a empresa, mesmo sabendo a resposta. "
-            "2) Dúvida do negócio sem fatos suficientes, contraditória ou que exige uma pessoa ou "
+            "3) Preço, contratação, horário, pedidos e suporte da empresa são assuntos do negócio, "
+            "mesmo sem informação: não os ignore. Dúvida do negócio sem fatos suficientes, contraditória ou que exige uma pessoa ou "
             "concluir uma operação sem integração: acao=\"encaminhar\", texto=\"Encaminhando.\", referencias=[]. "
-            "3) Caso contrário: acao=\"responder\", até duas frases curtas e referencias com os códigos "
+            "4) Caso contrário: acao=\"responder\", até duas frases curtas e referencias com os códigos "
             "dos documentos que realmente sustentam os fatos da resposta. Use somente a base e o histórico. "
             "Saudações e iniciar pedidos são pertinentes: pode perguntar detalhes com base nos serviços. "
             "Não invente preços, prazos, políticas, disponibilidade ou resultados de ações. "
@@ -77,9 +90,13 @@ def decide_support(settings, tenant, knowledge, text, history, use_ai, transport
         allowed_ids = {item["id"] for item in data["base"]}
         if (decision.acao == "responder" and not decision.referencias) or not set(decision.referencias) <= allowed_ids:
             raise ValueError()
-        if decision.acao == "ignorar" and decision.referencias:
+        if decision.acao in {"ignorar", "bloquear"} and decision.referencias:
             raise ValueError()
         decision.referencias = [references[code] for code in decision.referencias]
+        if decision.acao == "ignorar" and business_question(tenant, knowledge, text):
+            # A IA recusou uma consulta que menciona o negócio. Ofereça uma pessoa;
+            # não invente uma resposta nem confunda isso com a categoria de abuso.
+            decision = SupportDecision(acao="encaminhar", texto="Análise precisa de um responsável.", referencias=[])
         normalized = normalize_text(decision.texto)
         if decision.acao == "responder" and any(phrase in normalized for phrase in (
                 "nao contem informac", "nao possui informac", "nao tenho informac", "nao tenho essa informac",

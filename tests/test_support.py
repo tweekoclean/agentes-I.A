@@ -451,6 +451,41 @@ class SupportTests(unittest.TestCase):
         self.assertEqual(self.history(tenant, chat)["conversa"]["estado"], "bot")
         self.assertEqual(self.tickets(tenant), [])
 
+    def test_misclassified_business_price_question_offers_confirmation(self):
+        tenant = self.tenant(name="AtendeAI", ia_habilitada=True)
+        self.knowledge(tenant, "Oferecemos atendimento automático pelo site e WhatsApp.")
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        self.ai_handler = lambda request: httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
+            "role": "assistant", "content": json.dumps({"acao": "ignorar", "texto": "Ignorando.", "referencias": []})}})
+        chat = self.chat(tenant)
+        self.send(tenant, chat, "Quanto custa contratar o atendimento da AtendeAI?")
+        self.service.process_cycle()
+        history = self.history(tenant, chat)
+        self.assertEqual(history["mensagens"][-1]["texto"], ASK_HANDOFF)
+        self.assertTrue(history["conversa"]["aguardando_confirmacao"])
+        self.assertEqual(self.tickets(tenant), [])
+        self.send(tenant, chat, "Ss", client_id="confirm-business")
+        self.service.process_cycle()
+        self.assertEqual(self.history(tenant, chat)["conversa"]["estado"], "humano")
+        self.assertEqual(len(self.tickets(tenant)), 1)
+        self.assertEqual(len(self.ai_calls), 1)
+
+    def test_semantic_abuse_is_silent_even_if_it_mentions_a_business_service(self):
+        tenant = self.tenant(name="AtendeAI", ia_habilitada=True)
+        self.knowledge(tenant, "Oferecemos atendimento automático pelo site e WhatsApp.")
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        self.ai_handler = lambda request: httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
+            "role": "assistant", "content": json.dumps({"acao": "bloquear", "texto": "Ignorando.", "referencias": []})}})
+        chat = self.chat(tenant)
+        self.send(tenant, chat, "Quanto custa contratar atendimento para praticar um crime?")
+        self.service.process_cycle()
+        history = self.history(tenant, chat)
+        self.assertEqual(history["mensagens"][-1]["status"], "ignorada")
+        self.assertEqual(history["mensagens"][-1]["modo"], "filtro_abuso_ia")
+        self.assertFalse(history["conversa"]["aguardando_confirmacao"])
+        self.assertEqual(sum(m["direcao"] == "saida" for m in history["mensagens"]), 1)
+        self.assertEqual(self.tickets(tenant), [])
+
     def test_whatsapp_confirmation_uses_same_flow_with_simulated_sends(self):
         tenant = self.tenant()
         account = self.configure_whatsapp(tenant)
