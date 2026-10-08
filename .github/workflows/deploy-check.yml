@@ -1,0 +1,84 @@
+name: Conferir deploy AtendeAI
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/deploy-check.yml"]
+  pull_request:
+    branches: [main]
+    paths: [".github/workflows/deploy-check.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install httpx==0.28.1
+      - name: Conferir versão, banco e conversa de demonstração
+        run: |
+          python - <<'PY'
+          from urllib.parse import parse_qs, urlsplit
+          import time
+          import httpx
+          base = "https://atendeai-co.squareweb.app"
+          with httpx.Client(timeout=10, follow_redirects=False) as client:
+              for attempt in range(18):
+                  try:
+                      response = client.get(base + "/")
+                      response.raise_for_status()
+                      if response.json().get("versao") == "0.3.0":
+                          break
+                  except (httpx.HTTPError, ValueError):
+                      pass
+                  if attempt == 17:
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.3.0.")
+                  time.sleep(5)
+              health = client.get(base + "/health")
+              health.raise_for_status()
+              assert health.json()["status"] == "ok"
+              print("Versão 0.3.0 publicada; banco conectado.")
+              demo = client.get(base + "/demonstracao")
+              assert demo.status_code in (302, 307)
+              location = demo.headers["location"]
+              query = parse_qs(urlsplit(location).query)
+              tenant, key = query["empresa"][0], query["chave"][0]
+              page = client.get(base + location)
+              page.raise_for_status()
+              widget = client.get(base + "/widget/atendeai.js")
+              widget.raise_for_status()
+              opened = client.post(base + "/v1/atendimento/site/" + tenant + "/conversas",
+                                   headers={"Origin": base, "X-Site-Key": key})
+              opened.raise_for_status()
+              session = opened.json()
+              path = base + "/v1/atendimento/site/" + tenant + "/conversas/" + session["conversa"]["id"] + "/mensagens"
+              headers = {"Origin": base, "Authorization": "Bearer " + session["token_conversa"]}
+              question = client.post(path, headers=headers, json={"texto":"Quais serviços vocês oferecem?","id_cliente":"smoke-question"})
+              question.raise_for_status()
+              for attempt in range(20):
+                  history = client.get(path, headers=headers)
+                  history.raise_for_status()
+                  data = history.json()
+                  if any(item.get("modo") == "base_sem_ia" for item in data["mensagens"]):
+                      break
+                  if attempt == 19:
+                      raise SystemExit("A resposta da base não ficou disponível.")
+                  time.sleep(2)
+              handoff = client.post(path, headers=headers, json={"texto":"[Teste automático de implantação] Quero falar com um atendente.","id_cliente":"smoke-handoff"})
+              handoff.raise_for_status()
+              for attempt in range(20):
+                  history = client.get(path, headers=headers)
+                  history.raise_for_status()
+                  data = history.json()
+                  if data["conversa"]["estado"] == "humano":
+                      assert any(item["texto"] == "Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento." for item in data["mensagens"])
+                      break
+                  if attempt == 19:
+                      raise SystemExit("O encaminhamento não foi concluído.")
+                  time.sleep(2)
+              print("Chat de demonstração: sessão privada, resposta da base e encaminhamento com IA pausada verificados.")
+              print("Teste somente no site; nenhum envio de WhatsApp ou chamada paga de IA.")
+          PY
