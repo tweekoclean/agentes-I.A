@@ -2,6 +2,14 @@
 
 Data: 8 de outubro de 2026 (UTC).
 
+## Confirmação de encaminhamento e escopo na versão 0.5.4
+
+Os sistemas 1 e 2 são ferramentas comerciais internas da AtendeAI; a integração entregue aos negócios é o sistema 3. O serviço de atendimento agora pergunta se o cliente quer chamar um responsável quando não consegue responder, sem abrir chamado antes da aceitação. “Sim”, “ss” e variações de caixa/pontuação são aceitas. Uma recusa mantém o bot e a confirmação sobrevive a reinícios. O resumo do chamado preserva a dúvida anterior à confirmação.
+
+Ofensas dirigidas ao assistente e ameaças reconhecidas são ignoradas sem geração, resposta ou chamado, inclusive quando chegam em sequência antes do processamento. Essas entradas ficam fora do histórico usado pela IA. O modelo também pode classificar mensagens como fora do negócio e ignorá-las. Pedidos e dúvidas da empresa continuam pertinentes; a IA pode coletar dados, sem afirmar registro ou pagamento sem integração.
+
+112 testes automatizados passaram localmente. Os novos casos incluem confirmações, recusa, reinício, silêncio e exclusão do contexto de mensagens abusivas, decisão de ignorar, pergunta sobre regras de encaminhamento e o fluxo de WhatsApp com envios simulados. Não houve envio de WhatsApp real. A versão mantém o mesmo modelo e a escolha automática de CPU da 0.5.3; não altera o esquema do banco.
+
 ## Uso da CPU disponível na versão 0.5.3
 
 A versão 0.5.2 publicada respondeu à pergunta de demonstração em 21,4 segundos, contra 40,5 segundos antes dos ajustes. Uma continuação nessa conversa respondeu em 25,6 segundos. As duas respostas usaram o modo `ia`, sem encaminhamento. O diagnóstico detectou quota de quatro núcleos de CPU, mas o modelo continuava limitado a dois threads.

@@ -27,11 +27,11 @@ Adicione respostas reais pela rota `POST /v1/atendimento/empresas/{empresa_id}/b
 {"titulo":"Horário de atendimento","conteudo":"Atendemos de segunda a sexta, das 9h às 18h, no horário de São Paulo.","ativa":true}
 ```
 
-Use itens curtos, com fatos reais da empresa, até 2.000 caracteres. GET lista e PUT atualiza/desativa os itens. Sem IA, perguntas com correspondência na base recebem o texto cadastrado; as demais abrem um chamado. A busca considera até 100 itens ativos. Com IA local, prioriza os itens da pergunta e completa o contexto com até cinco itens da própria empresa. Inclui documentos inteiros que cabem no contexto, sem cortar exceções. Ainda não há busca vetorial de grandes documentos, upload de PDFs nem consulta a sistemas de pedidos.
+Use itens curtos, com fatos reais da empresa, até 2.000 caracteres. GET lista e PUT atualiza/desativa os itens. Sem IA, perguntas com correspondência na base recebem o texto cadastrado; as demais pedem confirmação antes de abrir um chamado. A busca considera até 100 itens ativos. Com IA local, prioriza os itens da pergunta e completa o contexto com até cinco itens da própria empresa. Inclui documentos inteiros que cabem no contexto, sem cortar exceções. Ainda não há busca vetorial de grandes documentos, upload de PDFs nem consulta a sistemas de pedidos.
 
 Para ativar a IA, configure o modelo local conforme [IA-LOCAL.md](IA-LOCAL.md) e use PATCH da empresa com `{"ia_habilitada":true}` ou marque o uso de IA no painel. As chamadas enviam a mensagem, até quatro mensagens recentes de contexto e somente fatos da própria empresa ao seu servidor local. Mensagens antigas podem ser removidas para caber no contexto. Tokens da conversa e credenciais do WhatsApp não entram na chamada. A base é fornecida como contexto, sem treinamento do modelo.
 
-O limite diário de IA é reservado no banco antes da chamada, no fuso de São Paulo. Falhas podem consumir a reserva. Ao atingir o teto, o sistema abre um chamado. PATCH também permite alterar limites, origens, boas-vindas ou desativar a empresa.
+O limite diário de IA é reservado no banco antes da chamada, no fuso de São Paulo. Falhas podem consumir a reserva. Ao atingir o teto, o sistema pergunta se o cliente quer um responsável antes de abrir o chamado. PATCH também permite alterar limites, origens, boas-vindas ou desativar a empresa.
 
 ## Incorporar o chat
 
@@ -70,7 +70,7 @@ Abra [o painel do operador](https://atendeai-co.squareweb.app/painel) e informe 
 
 A chave administrativa fica apenas em memória e precisa ser informada novamente após recarregar ou sair. O painel não deve ser distribuído com essa chave aos clientes: ela concede acesso a todas as empresas. A versão atual tem um operador administrativo; não há contas individuais ou permissões por funcionário. Base e configuração podem ser gerenciadas pelo painel sem executar rotas manualmente.
 
-GET /v1/atendimento/empresas/{id}/chamados lista a fila. O histórico completo está em /conversas/{conversa_id}. O sistema grava o chamado e pausa o bot antes de registrar a frase de encaminhamento.
+GET /v1/atendimento/empresas/{id}/chamados lista a fila. O histórico completo está em /conversas/{conversa_id}. Quando faltar uma resposta, o sistema pergunta se o cliente quer um responsável. Após aceitar com sim, ss ou equivalente, grava o chamado e pausa o bot. Uma recusa permite continuar a conversa. Pedidos explícitos de atendente já autorizam o encaminhamento.
 
 O operador responde por `POST /v1/atendimento/empresas/{id}/conversas/{conversa_id}/responder`:
 

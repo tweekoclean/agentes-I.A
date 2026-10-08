@@ -41,9 +41,15 @@ Ollama em seu PC não é o localhost da Square Cloud. Para uso local no PC, rode
 
 ## Decisões e encaminhamento
 
-A IA de suporte recebe somente fatos da empresa da conversa e histórico dessa conversa. Cada resposta precisa ser JSON válido e citar IDs da base fornecida; IDs de outra empresa são rejeitados. Alterações na base ou entrada de um atendente durante a geração invalidam a resposta pendente. Uma resposta incompleta, falha, excesso de contexto ou dúvida sem fatos abre chamado e pausa a automação. A mensagem ao cliente é:
+A IA de suporte recebe somente fatos da empresa da conversa e histórico dessa conversa. Cada resposta precisa ser JSON válido e citar IDs da base fornecida; IDs de outra empresa são rejeitados. Alterações na base ou entrada de um atendente durante a geração invalidam a resposta pendente. Desde 0.5.4, uma resposta incompleta, falha, excesso de contexto ou dúvida sem fatos solicita confirmação antes de abrir o chamado:
+
+> Não consegui responder sua solicitação com segurança. Quer que eu chame um responsável?
+
+Após “sim”, “ss” ou equivalente, registra o chamado e pausa o bot com a mensagem:
 
 > Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento.
+
+Uma recusa mantém o atendimento automático. Um pedido explícito de atendente já confirma o encaminhamento. Ofensas reconhecidas são ignoradas antes da inferência; a IA pode escolher `ignorar` para assuntos fora do negócio. Nenhuma resposta é publicada nessa decisão e mensagens ignoradas são excluídas do contexto recente. Consulte [PRODUTO.md](PRODUTO.md) para a separação dos três sistemas e o tratamento de pedidos.
 
 Essa validação reduz falhas; não comprova que todo fato gerado é correto. Teste especialmente preços, políticas e exceções antes de oferecer o atendimento às empresas. O modelo não modifica consentimento, telefones, permissões ou configurações, nem confirma ações em sistemas que não foram integrados. A busca de empresas continua usando a fonte cadastrada; a IA não inventa empresas. O envio pelo WhatsApp continua exigindo a conta oficial configurada e as permissões já implementadas.
 

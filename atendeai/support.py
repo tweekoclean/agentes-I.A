@@ -11,7 +11,9 @@ from .commercial_inbox import normalize_text
 from .models import (SupportConversation, SupportHandoff, SupportKnowledge, SupportMessage,
                      SupportQuota, SupportTenant, as_utc, utcnow)
 from .service import db_insert
-from .support_brain import decide_support, select_knowledge
+from .support_brain import SupportDecision, decide_support, select_knowledge
+from .support_policy import (ASK_HANDOFF, CONFIRMATION_PREFIX, DECLINE_HANDOFF,
+                             abusive_message, confirmation_reply, explicit_human_request)
 
 
 DEMO_TENANT_ID = "00000000-0000-4000-a000-000000000003"
@@ -37,7 +39,8 @@ def support_message_data(row, private=False):
 
 def support_conversation_data(row, private=False):
     result = {"id": row.id, "empresa_id": row.tenant_id, "canal": row.channel, "estado": row.state,
-              "motivo_pausa": row.pause_reason, "criada_em": as_utc(row.created_at).isoformat()}
+              "motivo_pausa": row.pause_reason, "criada_em": as_utc(row.created_at).isoformat(),
+              "aguardando_confirmacao": bool(row.pause_reason and row.pause_reason.startswith(CONFIRMATION_PREFIX))}
     if private:
         result["contato"] = row.recipient if row.channel == "whatsapp" else None
     return result
@@ -257,28 +260,47 @@ class SupportService:
             session.commit()
             if claimed.rowcount != 1:
                 return 0
-        reason, decision, engine = None, None, "regras_suporte"
+        reason, decision, engine, confirmed = None, None, "regras_suporte", False
         with self.sessions() as session:
             inbound = session.get(SupportMessage, identifier)
             tenant = self.tenant(session, inbound.tenant_id, lock=True)
             conversation = self.conversation(session, tenant.id, inbound.conversation_id, lock=True)
+            if abusive_message(inbound.text):
+                inbound.status, inbound.engine = "ignorada", "filtro_abuso"
+                session.commit()
+                return 1
             if not tenant.active or conversation.state != "bot" or conversation.last_inbound_id != inbound.id:
                 inbound.status = "processada"
                 session.commit()
                 return 1
             normalized = normalize_text(inbound.text)
-            if inbound.kind != "text":
+            pending = conversation.pause_reason or ""
+            if pending.startswith(CONFIRMATION_PREFIX):
+                answer = confirmation_reply(inbound.text)
+                if answer is True:
+                    reason, confirmed = pending[len(CONFIRMATION_PREFIX):], True
+                elif answer is False:
+                    conversation.pause_reason = None
+                    decision = SupportDecision(acao="responder", texto=DECLINE_HANDOFF, referencias=[])
+                    engine = "confirmacao_recusada"
+                elif normalized in {"talvez", "nao sei", "como assim"}:
+                    decision = SupportDecision(acao="responder", texto="Quer que eu chame um responsável? Responda sim ou não.", referencias=[])
+                    engine = "confirmacao_responsavel"
+                else:
+                    conversation.pause_reason = None
+            if reason or decision:
+                pass
+            elif inbound.kind != "text":
                 reason = "mensagem_de_midia"
             elif conversation.channel == "whatsapp" and not self.account_settings(tenant.id).whatsapp_ready:
                 reason = "whatsapp_nao_configurado"
-            elif any(word in normalized for word in ["humano", "atendente", "responsavel", "uma pessoa", "cancelar pedido", "reembolso"]):
+            elif explicit_human_request(inbound.text):
                 reason = "precisa_responsavel"
             elif conversation.auto_replies >= 20:
                 reason = "limite_conversa_automatica"
             elif conversation.channel == "whatsapp" and as_utc(inbound.occurred_at) + timedelta(hours=24) <= now:
                 reason = "janela_resposta_encerrada"
             elif normalized in {"oi", "ola", "bom dia", "boa tarde", "boa noite"} and not (tenant.ai_enabled and self.settings.ai_configured):
-                from .support_brain import SupportDecision
                 decision = SupportDecision(acao="responder", texto=tenant.welcome_text, referencias=[])
                 engine = "boas_vindas"
             items = [] if reason or decision else session.scalars(select(SupportKnowledge).where(
@@ -297,7 +319,9 @@ class SupportService:
             knowledge = [{"id": row.id, "titulo": row.title, "conteudo": row.content} for row in selected]
             history = [{"direcao": row.direction, "texto": row.text[:2000]} for row in reversed(session.scalars(
                 select(SupportMessage).where(SupportMessage.conversation_id == conversation.id, SupportMessage.id != inbound.id)
-                .order_by(SupportMessage.created_at.desc()).limit(8)).all())]
+                .where(SupportMessage.status != "ignorada")
+                .order_by(SupportMessage.created_at.desc()).limit(8)).all())
+                if row.direction != "entrada" or not abusive_message(row.text)]
             tenant_id, conversation_id, current_text = tenant.id, conversation.id, inbound.text
             session.commit()
         if not reason and not decision:
@@ -315,11 +339,28 @@ class SupportService:
                     if not current or not current.active or current.title != item["titulo"] or current.content != item["conteudo"]:
                         reason = "base_alterada_durante_resposta"
                         break
-                if reason:
-                    self.handoff(session, conversation, inbound, reason)
+                if decision and decision.acao == "ignorar":
+                    inbound.status, inbound.engine = "ignorada", "fora_de_contexto"
+                    session.commit()
+                    return 1
+                if reason and (confirmed or reason in {"precisa_responsavel", "whatsapp_nao_configurado", "janela_resposta_encerrada"}):
+                    source = inbound
+                    if confirmed:
+                        offer = session.scalar(select(SupportMessage).where(
+                            SupportMessage.conversation_id == conversation.id, SupportMessage.direction == "saida",
+                            SupportMessage.text == ASK_HANDOFF, SupportMessage.engine == "confirmacao_responsavel")
+                            .order_by(SupportMessage.created_at.desc()).limit(1))
+                        if offer and offer.reply_to_id:
+                            original = session.get(SupportMessage, offer.reply_to_id)
+                            if original and original.conversation_id == conversation.id:
+                                source = original
+                    self.handoff(session, conversation, source, reason)
                     if conversation.channel == "site" or (self.account_settings(tenant_id).whatsapp_ready and conversation.last_inbound_at and
                             as_utc(conversation.last_inbound_at) + timedelta(hours=24) > utcnow()):
                         self.add_reply(session, conversation, SUPPORT_HANDOFF, "sistema", inbound, engine)
+                elif reason:
+                    conversation.pause_reason = CONFIRMATION_PREFIX + reason
+                    self.add_reply(session, conversation, ASK_HANDOFF, "sistema", inbound, "confirmacao_responsavel")
                 else:
                     self.add_reply(session, conversation, decision.texto, "assistente", inbound, engine)
             inbound.status = "processada"

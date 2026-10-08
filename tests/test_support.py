@@ -17,6 +17,7 @@ from atendeai.config import Settings
 from atendeai.models import SupportConversation, SupportMessage, SupportQuota, SupportTenant, utcnow
 from atendeai.support import SUPPORT_HANDOFF
 from atendeai.support_whatsapp import process_outbound
+from atendeai.support_policy import ASK_HANDOFF, DECLINE_HANDOFF
 
 KEY = "support-test-administrative-key-not-secret"
 ADMIN = {"X-API-Key": KEY}
@@ -185,11 +186,18 @@ class SupportTests(unittest.TestCase):
         self.post("/v1/atendimento/processar")
         self.assertEqual(len(self.history(tenant, chat)["mensagens"]), 3)
 
-    def test_unknown_question_registers_ticket_pauses_bot_and_preserves_history(self):
+    def test_unknown_question_requests_confirmation_before_opening_ticket(self):
         tenant = self.tenant()
         self.knowledge(tenant)
         chat = self.chat(tenant)
         self.send(tenant, chat, "Onde está meu pedido 123?")
+        self.post("/v1/atendimento/processar")
+        history = self.history(tenant, chat)
+        self.assertEqual(history["mensagens"][-1]["texto"], ASK_HANDOFF)
+        self.assertEqual(history["conversa"]["estado"], "bot")
+        self.assertTrue(history["conversa"]["aguardando_confirmacao"])
+        self.assertEqual(self.tickets(tenant), [])
+        self.send(tenant, chat, "SS!", client_id="confirm")
         self.post("/v1/atendimento/processar")
         history = self.history(tenant, chat)
         self.assertEqual(history["mensagens"][-1]["texto"], SUPPORT_HANDOFF)
@@ -199,7 +207,7 @@ class SupportTests(unittest.TestCase):
         self.send(tenant, chat, client_id="second")
         self.post("/v1/atendimento/processar")
         self.assertEqual(len(self.tickets(tenant)), 1)
-        self.assertEqual(len(self.history(tenant, chat)["mensagens"]), 4)
+        self.assertEqual(len(self.history(tenant, chat)["mensagens"]), 6)
 
     def test_human_response_reaches_same_visitor_and_resume_resolves_ticket(self):
         tenant = self.tenant()
@@ -253,7 +261,10 @@ class SupportTests(unittest.TestCase):
         self.send(tenant, chat)
         self.post("/v1/atendimento/processar")
         self.assertEqual(len(self.ai_calls), 1)
-        self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["texto"], SUPPORT_HANDOFF)
+        self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["texto"], ASK_HANDOFF)
+        self.assertEqual(self.tickets(tenant), [])
+        self.send(tenant, chat, "sim", client_id="confirm")
+        self.post("/v1/atendimento/processar")
         self.assertEqual(self.tickets(tenant)[0]["motivo"], "falha_ia")
 
     def test_valid_ai_answer_and_daily_ai_budget(self):
@@ -269,6 +280,9 @@ class SupportTests(unittest.TestCase):
         self.send(tenant, second)
         self.post("/v1/atendimento/processar")
         self.assertEqual(len(self.ai_calls), 1)
+        self.assertEqual(self.tickets(tenant), [])
+        self.send(tenant, second, "Sim", client_id="confirm")
+        self.post("/v1/atendimento/processar")
         self.assertEqual(self.tickets(tenant)[0]["motivo"], "limite_ia_diario")
 
     def test_ai_can_use_small_base_for_a_question_with_different_wording(self):
@@ -295,8 +309,125 @@ class SupportTests(unittest.TestCase):
         self.ai_handler = handler
         self.send(tenant, chat)
         self.post("/v1/atendimento/processar")
-        self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["texto"], SUPPORT_HANDOFF)
+        self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["texto"], ASK_HANDOFF)
+        self.send(tenant, chat, "ss", client_id="confirm")
+        self.post("/v1/atendimento/processar")
         self.assertEqual(self.tickets(tenant)[0]["motivo"], "base_alterada_durante_resposta")
+
+    def test_confirmation_accepts_case_and_short_variations_without_ai_call(self):
+        for answer in ["sim", "Sim", "SIM", "ss", "Ss", "SS!", "s", "pode chamar"]:
+            with self.subTest(answer=answer):
+                tenant = self.tenant()
+                chat = self.chat(tenant)
+                self.send(tenant, chat, "Quanto custa o serviço?")
+                self.service.process_cycle()
+                self.assertEqual(self.tickets(tenant), [])
+                self.send(tenant, chat, answer, client_id="confirm")
+                self.service.process_cycle()
+                self.assertEqual(self.history(tenant, chat)["conversa"]["estado"], "humano")
+                self.assertEqual(len(self.tickets(tenant)), 1)
+        self.assertEqual(self.ai_calls, [])
+
+    def test_declining_handoff_keeps_bot_active_and_can_answer_next_question(self):
+        tenant = self.tenant()
+        self.knowledge(tenant)
+        chat = self.chat(tenant)
+        self.send(tenant, chat, "Qual preço?")
+        self.service.process_cycle()
+        self.send(tenant, chat, "nn", client_id="decline")
+        self.service.process_cycle()
+        history = self.history(tenant, chat)
+        self.assertFalse(history["conversa"]["aguardando_confirmacao"])
+        self.assertEqual(history["mensagens"][-1]["texto"], DECLINE_HANDOFF)
+        self.assertEqual(self.tickets(tenant), [])
+        self.send(tenant, chat, "Qual horário de atendimento?", client_id="next")
+        self.service.process_cycle()
+        self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["modo"], "base_sem_ia")
+
+    def test_abuse_is_silent_and_excluded_from_next_ai_context(self):
+        tenant = self.tenant(ia_habilitada=True)
+        self.knowledge(tenant)
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        chat = self.chat(tenant)
+        for index, message in enumerate(["chupa meu pênis", "posso matar você", "vou te matar", "vai se foder"]):
+            self.send(tenant, chat, message, client_id=f"abuse-{index}")
+        for _ in range(4):
+            self.service.process_cycle()
+        history = self.history(tenant, chat)
+        self.assertEqual(sum(m["direcao"] == "saida" for m in history["mensagens"]), 1)
+        self.assertTrue(all(m["status"] == "ignorada" for m in history["mensagens"] if m["direcao"] == "entrada"))
+        self.assertEqual(self.ai_calls, [])
+        self.assertEqual(self.tickets(tenant), [])
+        def handler(request):
+            self.assertNotIn("matar", request.content.decode())
+            self.assertNotIn("penis", request.content.decode())
+            self.assertNotIn("pênis", request.content.decode())
+            return self.ai_result("1")
+        self.ai_handler = handler
+        self.send(tenant, chat, "Qual horário?", client_id="normal")
+        self.service.process_cycle()
+        self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["modo"], "ia")
+
+    def test_off_topic_ai_decision_sends_nothing_and_opens_no_ticket(self):
+        tenant = self.tenant(ia_habilitada=True)
+        self.knowledge(tenant)
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        self.ai_handler = lambda request: httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
+            "role": "assistant", "content": json.dumps({"acao": "ignorar", "texto": "Ignorando.", "referencias": []})}})
+        chat = self.chat(tenant)
+        self.send(tenant, chat, "Qual a capital do Japão?")
+        self.service.process_cycle()
+        history = self.history(tenant, chat)
+        self.assertEqual(len(history["mensagens"]), 2)
+        self.assertEqual(history["mensagens"][-1]["status"], "ignorada")
+        self.assertEqual(self.tickets(tenant), [])
+
+    def test_yes_without_pending_confirmation_does_not_open_human_ticket(self):
+        tenant = self.tenant()
+        chat = self.chat(tenant)
+        self.send(tenant, chat, "ss")
+        self.service.process_cycle()
+        self.assertEqual(self.history(tenant, chat)["conversa"]["estado"], "bot")
+        self.assertEqual(self.tickets(tenant), [])
+
+    def test_whatsapp_confirmation_uses_same_flow_with_simulated_sends(self):
+        tenant = self.tenant()
+        account = self.configure_whatsapp(tenant)
+        self.webhook(tenant, account, self.whatsapp_event("Quanto custa o serviço?", remote_id="wamid.ask"))
+        self.service.process_cycle()
+        self.assertEqual(self.tickets(tenant), [])
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(json.loads(self.calls[0].content)["text"]["body"], ASK_HANDOFF)
+        self.webhook(tenant, account, self.whatsapp_event("Ss", remote_id="wamid.confirm"))
+        self.service.process_cycle()
+        self.assertEqual(len(self.tickets(tenant)), 1)
+        self.assertEqual(len(self.calls), 2)
+        self.assertEqual(json.loads(self.calls[1].content)["text"]["body"], SUPPORT_HANDOFF)
+
+    def test_confirmation_survives_a_new_service_instance(self):
+        from atendeai.support import SupportService
+        tenant = self.tenant()
+        chat = self.chat(tenant)
+        self.send(tenant, chat, "Qual preço?")
+        self.service.process_cycle()
+        self.send(tenant, chat, "Sim", client_id="confirm-after-restart")
+        fresh = SupportService(self.sessions, self.settings)
+        fresh.process_cycle()
+        self.assertEqual(self.history(tenant, chat)["conversa"]["estado"], "humano")
+        self.assertEqual(len(self.tickets(tenant)), 1)
+
+    def test_food_order_and_handoff_policy_question_are_not_blocked_as_abuse_or_human_request(self):
+        tenant = self.tenant(ia_habilitada=True)
+        self.knowledge(tenant, "O restaurante serve picanha e oferece entrega. Atendentes assumem quando solicitado.")
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        self.ai_handler = lambda request: self.ai_result("1", "Qual quantidade você deseja?")
+        chat = self.chat(tenant)
+        for index, text in enumerate(["Quero matar minha fome e pedir picanha", "Quando vocês chamam um responsável?"]):
+            self.send(tenant, chat, text, client_id=f"business-{index}")
+            self.service.process_cycle()
+            self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["modo"], "ia")
+        self.assertEqual(self.tickets(tenant), [])
+
 
     def test_human_takeover_during_ai_analysis_discards_pending_bot_response(self):
         tenant = self.tenant(ia_habilitada=True)

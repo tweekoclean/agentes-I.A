@@ -1,4 +1,6 @@
-# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.3
+# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.4
+
+Pesquisa e prospecção são ferramentas internas da AtendeAI; as empresas contratantes recebem o atendimento do sistema 3. Consulte [PRODUTO.md](PRODUTO.md) para o fluxo completo, confirmação de encaminhamento e mensagens ignoradas.
 
 Plataforma organizada em três módulos:
 
@@ -205,7 +207,7 @@ O banco registra fila, entradas, respostas, encaminhamentos, pedidos de interrup
 
 O agente 3 está implementado com cadastro de empresas contratantes, origens permitidas, base de respostas, conversas privadas e chamados. O widget incorporável usa a API da AtendeAI; cada conta WhatsApp tem um webhook assinado e credenciais separadas no ambiente.
 
-Quando precisar de uma pessoa, o sistema grava um chamado com acesso ao histórico, pausa o bot e responde: “Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento.” O operador consulta os chamados e responde pela API, na mesma conversa. Não há painel visual de operadores ou aviso externo nesta versão.
+Quando não conseguir responder, pergunta se o cliente quer um responsável. Após “sim”, “ss” ou equivalente, grava o chamado, pausa o bot e responde: “Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento.” Um pedido explícito de atendente confirma diretamente. O operador consulta o histórico e responde pelo painel ou API, na mesma conversa. Mensagens ofensivas reconhecidas e assuntos classificados como fora do negócio são ignorados sem resposta automática.
 
 A IA é ativada por empresa. Sem chave/ativação, perguntas com correspondência na base recebem o texto cadastrado e outras dúvidas são encaminhadas. Há limites diários configuráveis de novas conversas e chamadas de IA, e tokens próprios para os visitantes. A chave administrativa nunca entra no widget.
 
