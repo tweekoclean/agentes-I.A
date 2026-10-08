@@ -2,6 +2,16 @@
 
 Data: 8 de outubro de 2026 (UTC).
 
+## Redução de latência na versão 0.5.2
+
+O teste anterior à alteração, no chat público da Square Cloud, respondeu em modo `ia` após 40,5 segundos. A versão 0.5.2 pré-carrega o modelo no início, mantém os pesos em memória por 30 minutos após uso, compacta o contexto e reconverte referências curtas para os IDs reais dos documentos da própria empresa. O suporte limita a geração a 256 tokens. Não há cache de respostas prontas; o modelo continua elaborando cada resposta e a validação de contexto, referências e intervenção humana continua ativa.
+
+Na comparação local, com o mesmo `qwen3:4b`, contexto 4096, dois threads e modelo já carregado antes de ambos os casos, a pergunta “Tenho clientes no site e no WhatsApp. Como vocês podem ajudar?” passou de 59,42 para 30,76 segundos. O contexto passou de 760 para 498 tokens e a saída de 106 para 64 tokens; o texto de resposta foi o mesmo. Carregamento prévio separado: 13,68 segundos. As durações variam com a carga da máquina; os tempos locais não substituem medição na hospedagem.
+
+O modelo real também respondeu corretamente sobre uma loja fictícia fechada no sábado às 14h (fecha às 13h), permitiu visita no sábado às 10h e encaminhou a pergunta de preço ausente da base. Esses testes levaram 13,40, 15,96 e 6,05 segundos respectivamente. Não houve chamada à OpenAI ou envio de WhatsApp. O diagnóstico administrativo passa a mostrar contagens e tempos de geração, sem conteúdo de conversas ou credenciais.
+
+102 testes automatizados passaram localmente. Os novos casos verificam pré-carregamento sem mensagem de cliente, referências curtas convertidas apenas para documentos da requisição, ordem estável do contexto, retenção limitada em memória e diagnóstico sem conteúdo privado. Os testes existentes de alteração da base, tomada de atendimento por humano, isolamento entre empresas e ausência de fallback pago continuam passando.
+
 ## Correção da demonstração na versão 0.5.1
 
 A demonstração publicada estava com o teto antigo de uma resposta de IA por dia. Depois que a IA local foi ativada, novas perguntas abriram chamados com motivo `limite_ia_diario` antes de chamar o modelo. O cadastro dessa demonstração foi ajustado para 100 respostas por dia, e a conversa mais recente pausada por esse limite foi retomada. O padrão de novas demonstrações agora também é 100; limites individuais escolhidos pelo operador continuam preservados nos reinícios.

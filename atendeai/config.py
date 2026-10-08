@@ -27,6 +27,7 @@ class Settings:
     local_ai_context: int = 4096
     local_ai_max_tokens: int = 512
     local_ai_threads: int = 2
+    local_ai_keep_alive_minutes: int = 30
     database_ssl_pem_b64: str = field(default="", repr=False)
     database_ssl_ca_b64: str = field(default="", repr=False)
     database_ssl_cert_b64: str = field(default="", repr=False)
@@ -67,6 +68,7 @@ class Settings:
             local_ai_context=int(os.getenv("LOCAL_AI_CONTEXT", "4096")),
             local_ai_max_tokens=int(os.getenv("LOCAL_AI_MAX_TOKENS", "512")),
             local_ai_threads=int(os.getenv("LOCAL_AI_THREADS", "2")),
+            local_ai_keep_alive_minutes=int(os.getenv("LOCAL_AI_KEEP_ALIVE_MINUTES", "30")),
             database_ssl_pem_b64=os.getenv("DATABASE_SSL_PEM_B64", ""),
             database_ssl_ca_b64=os.getenv("DATABASE_SSL_CA_B64", ""),
             database_ssl_cert_b64=os.getenv("DATABASE_SSL_CERT_B64", ""),
@@ -133,6 +135,8 @@ class Settings:
             raise ValueError("LOCAL_AI_TIMEOUT deve ser 10 a 150; LOCAL_AI_CONTEXT, 2048 a 8192.")
         if not 128 <= self.local_ai_max_tokens <= 1024 or not 1 <= self.local_ai_threads <= 8:
             raise ValueError("LOCAL_AI_MAX_TOKENS deve ser 128 a 1024; LOCAL_AI_THREADS, 1 a 8.")
+        if not 1 <= self.local_ai_keep_alive_minutes <= 1440:
+            raise ValueError("LOCAL_AI_KEEP_ALIVE_MINUTES deve ser 1 a 1440.")
         if self.search_provider not in {"demo", "overpass"}:
             raise ValueError("SEARCH_PROVIDER deve ser demo ou overpass.")
         if not self.overpass_url.startswith("https://"):

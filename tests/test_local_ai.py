@@ -9,7 +9,7 @@ import tarfile
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 import httpx
@@ -17,7 +17,7 @@ import zstandard
 
 from atendeai.api import create_app
 from atendeai.config import Settings
-from atendeai.local_ai import INFERENCE_SLOT, LocalAIError, generate_json, local_ai_status
+from atendeai.local_ai import INFERENCE_SLOT, LAST_METRICS, LocalAIError, generate_json, local_ai_status
 from atendeai.local_ai_runtime import LocalAIRuntime, extract_cpu_runtime
 from atendeai.support_brain import decide_support
 
@@ -28,6 +28,9 @@ SCHEMA = {"type": "object", "properties": {"texto": {"type": "string"}}, "requir
 class LocalAITests(unittest.TestCase):
     def setUp(self):
         self.settings = Settings(environment="test", database_url="sqlite:///:memory:", admin_api_key=KEY, ai_provider="ollama")
+        self.metrics_patch = patch.dict(LAST_METRICS, {}, clear=True)
+        self.metrics_patch.start()
+        self.addCleanup(self.metrics_patch.stop)
 
     def test_legacy_paid_provider_key_cannot_enable_or_select_a_paid_provider(self):
         with patch.dict(os.environ, {"AI_PROVIDER": "none", "OPENAI_API_KEY": "unused-test-value"}):
@@ -60,6 +63,7 @@ class LocalAITests(unittest.TestCase):
             self.assertFalse(body["think"])
             self.assertEqual(body["options"]["num_ctx"], 4096)
             self.assertEqual(body["options"]["num_predict"], 512)
+            self.assertEqual(body["keep_alive"], "30m")
             self.assertEqual(body["format"], SCHEMA)
             return httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
                 "role": "assistant", "content": '{"texto":"Resposta criada localmente"}'}})
@@ -98,9 +102,9 @@ class LocalAITests(unittest.TestCase):
                      {"id": "large", "titulo": "Documento longo", "conteudo": "x" * 9000}]
         def handler(request):
             data = json.loads(json.loads(request.content)["messages"][1]["content"])
-            self.assertEqual([item["id"] for item in data["base"]], ["small"])
+            self.assertEqual([item["id"] for item in data["base"]], ["1"])
             return httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
-                "role": "assistant", "content": json.dumps({"acao": "responder", "texto": "Fato não fornecido", "referencias": ["large"]})}})
+                "role": "assistant", "content": json.dumps({"acao": "responder", "texto": "Fato não fornecido", "referencias": ["2"]})}})
         decision, mode = decide_support(self.settings, SimpleNamespace(name="Teste"), knowledge, "Qual horário?", [], True, httpx.MockTransport(handler))
         self.assertEqual(decision.acao, "encaminhar")
         self.assertEqual(mode, "falha_ia")
@@ -108,12 +112,83 @@ class LocalAITests(unittest.TestCase):
     def test_model_admitting_missing_information_becomes_a_real_handoff(self):
         def handler(request):
             return httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
-                "role": "assistant", "content": json.dumps({"acao": "responder", "texto": "A base não contém informações sobre esse preço.", "referencias": ["hours"]})}})
+                "role": "assistant", "content": json.dumps({"acao": "responder", "texto": "A base não contém informações sobre esse preço.", "referencias": ["1"]})}})
         decision, mode = decide_support(self.settings, SimpleNamespace(name="Teste"),
             [{"id": "hours", "titulo": "Horário", "conteudo": "Abre às 9h."}], "Qual preço?", [], True, httpx.MockTransport(handler))
         self.assertEqual(decision.acao, "encaminhar")
         self.assertEqual(decision.referencias, [])
         self.assertEqual(mode, "ia")
+
+    def test_short_reference_codes_map_to_only_the_documents_in_this_request(self):
+        private_id = "c8a9e9d5-5634-4cee-b826-22409108d171"
+        def handler(request):
+            body = json.loads(request.content)
+            data = json.loads(body["messages"][1]["content"])
+            self.assertNotIn(private_id, request.content.decode())
+            self.assertEqual(body["options"]["num_predict"], 256)
+            self.assertEqual(data["base"][0]["id"], "1")
+            return httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
+                "role": "assistant", "content": json.dumps({"acao": "responder", "texto": "Abrimos às 9h.", "referencias": ["1"]})}})
+        decision, mode = decide_support(self.settings, SimpleNamespace(name="Teste"),
+            [{"id": private_id, "titulo": "Horário", "conteudo": "Abre às 9h."}], "Qual horário?", [], True, httpx.MockTransport(handler))
+        self.assertEqual(decision.referencias, [private_id])
+        self.assertEqual(mode, "ia")
+
+    def test_metrics_expose_only_timings_and_counts_for_the_same_model_endpoint(self):
+        response = {"done": True, "done_reason": "stop", "load_duration": 20_000_000,
+                    "prompt_eval_duration": 50_000_000, "eval_duration": 90_000_000,
+                    "prompt_eval_count": 123, "eval_count": 25,
+                    "message": {"role": "assistant", "content": '{"texto":"PRIVATE_ANSWER_VALUE"}'}}
+        generate_json(self.settings, "PRIVATE_INSTRUCTIONS_VALUE", {"texto": "PRIVATE_CUSTOMER_VALUE"}, SCHEMA,
+                      httpx.MockTransport(lambda request: httpx.Response(200, json=response)))
+        transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"models": [{"name": "qwen3:4b"}]}))
+        status = local_ai_status(self.settings, transport)
+        metrics = status["ultima_geracao"]
+        self.assertEqual((metrics["carga_ms"], metrics["entrada_ms"], metrics["geracao_ms"]), (20, 50, 90))
+        self.assertEqual((metrics["tokens_entrada"], metrics["tokens_saida"]), (123, 25))
+        self.assertNotIn("PRIVATE_", json.dumps(status))
+        self.assertNotIn("ultima_geracao", local_ai_status(replace(self.settings, local_ai_model="qwen3:1.7b"), transport))
+        self.assertNotIn("ultima_geracao", local_ai_status(replace(self.settings, local_ai_url="https://different.example.invalid"), transport))
+
+    def test_document_order_is_stable_between_questions_with_different_relevance(self):
+        knowledge = [{"id": "second", "titulo": "Entrega", "conteudo": "Entrega no centro."},
+                     {"id": "first", "titulo": "Horário", "conteudo": "Abre às 9h."}]
+        documents = []
+        def handler(request):
+            data = json.loads(json.loads(request.content)["messages"][1]["content"])
+            documents.append(data["base"])
+            return httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
+                "role": "assistant", "content": json.dumps({"acao": "responder", "texto": "Abrimos às 9h.", "referencias": ["1"]})}})
+        for items, question in [(knowledge, "Qual horário?"), (knowledge[::-1], "E a entrega?")]:
+            decision, mode = decide_support(self.settings, SimpleNamespace(name="Teste"), items, question, [], True, httpx.MockTransport(handler))
+            self.assertEqual(decision.referencias, ["first"])
+            self.assertEqual(mode, "ia")
+        self.assertEqual(documents[0], documents[1])
+
+    def test_model_retention_has_an_explicit_bound(self):
+        for minutes in (0, 1441):
+            with self.assertRaises(ValueError):
+                replace(self.settings, local_ai_keep_alive_minutes=minutes).validated()
+        replace(self.settings, local_ai_keep_alive_minutes=30).validated()
+
+    def test_runtime_preloads_without_generating_a_customer_message(self):
+        runtime = LocalAIRuntime(replace(self.settings, local_ai_autostart=True))
+        client = Mock()
+        client.get.return_value = httpx.Response(200, json={"version": "test"}, request=httpx.Request("GET", "http://127.0.0.1:11434/api/version"))
+        client.post.return_value = httpx.Response(200, json={"done": True, "done_reason": "load"}, request=httpx.Request("POST", "http://127.0.0.1:11434/api/chat"))
+        process = Mock()
+        process.poll.return_value = None
+        with patch("atendeai.local_ai_runtime.subprocess.Popen", return_value=process), \
+             patch("atendeai.local_ai_runtime.httpx.Client") as factory, \
+             patch("atendeai.local_ai_runtime.local_ai_status", return_value={"pronta": True}):
+            factory.return_value.__enter__.return_value = client
+            runtime.start_and_pull(Path("/fake/ollama"))
+        args, kwargs = client.post.call_args
+        self.assertEqual(args, ("http://127.0.0.1:11434/api/chat",))
+        self.assertEqual(kwargs["json"]["messages"], [])
+        self.assertEqual(kwargs["json"]["keep_alive"], "30m")
+        self.assertEqual(kwargs["json"]["options"]["num_ctx"], self.settings.local_ai_context)
+        self.assertEqual(runtime.state, "pronta")
 
     def test_status_distinguishes_unavailable_missing_and_installed_model_without_generation(self):
         for response, state in [(httpx.Response(503), "indisponivel"), (httpx.Response(200, json={"models": []}), "modelo_pendente"),

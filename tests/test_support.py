@@ -248,7 +248,7 @@ class SupportTests(unittest.TestCase):
             self.assertFalse(body["format"]["additionalProperties"])
             self.assertNotIn("ABC987", body["messages"][1]["content"])
             self.assertNotIn(chat["token_conversa"], body["messages"][1]["content"])
-            return self.ai_result(other_item["id"], "Informação de outra empresa")
+            return self.ai_result("2", "Informação de outra empresa")
         self.ai_handler = handler
         self.send(tenant, chat)
         self.post("/v1/atendimento/processar")
@@ -260,7 +260,7 @@ class SupportTests(unittest.TestCase):
         tenant = self.tenant(ia_habilitada=True, limite_ia_dia=1)
         item = self.knowledge(tenant)
         self.service.settings = replace(self.service.settings, ai_provider="ollama")
-        self.ai_handler = lambda request: self.ai_result(item["id"])
+        self.ai_handler = lambda request: self.ai_result("1")
         first = self.chat(tenant)
         self.send(tenant, first)
         self.post("/v1/atendimento/processar")
@@ -275,7 +275,7 @@ class SupportTests(unittest.TestCase):
         tenant = self.tenant(ia_habilitada=True)
         item = self.knowledge(tenant)
         self.service.settings = replace(self.service.settings, ai_provider="ollama")
-        self.ai_handler = lambda request: self.ai_result(item["id"], "Abrimos às 9h.")
+        self.ai_handler = lambda request: self.ai_result("1", "Abrimos às 9h.")
         chat = self.chat(tenant)
         self.send(tenant, chat, "Até que horas vocês ficam abertos?")
         self.post("/v1/atendimento/processar")
@@ -291,7 +291,7 @@ class SupportTests(unittest.TestCase):
             changed = self.client.put(f"/v1/atendimento/empresas/{tenant['id']}/base/{item['id']}", headers=ADMIN,
                                       json={"titulo": item["titulo"], "conteudo": "Novo horário: das 14h às 20h."})
             self.assertEqual(changed.status_code, 200)
-            return self.ai_result(item["id"], "Horário antigo das 9h às 18h.")
+            return self.ai_result("1", "Horário antigo das 9h às 18h.")
         self.ai_handler = handler
         self.send(tenant, chat)
         self.post("/v1/atendimento/processar")
@@ -305,7 +305,7 @@ class SupportTests(unittest.TestCase):
         chat = self.chat(tenant)
         def handler(request):
             self.service.human_reply(tenant["id"], chat["conversa"]["id"], "Vou assumir o atendimento.")
-            return self.ai_result(item["id"], "Resposta da IA")
+            return self.ai_result("1", "Resposta da IA")
         self.ai_handler = handler
         self.send(tenant, chat)
         self.post("/v1/atendimento/processar")
@@ -404,7 +404,7 @@ class SupportTests(unittest.TestCase):
         updated = self.client.patch(f"/v1/atendimento/empresas/{DEMO_TENANT_ID}", headers=ADMIN,
                                     json={"ia_habilitada": True})
         self.assertEqual(updated.status_code, 200)
-        self.ai_handler = lambda request: self.ai_result("00000000-0000-4000-a000-000000000031")
+        self.ai_handler = lambda request: self.ai_result("1")
         self.service.ensure_demo()
         chat = self.chat({"id": DEMO_TENANT_ID, "chave_site": DEMO_SITE_KEY}, origin=DEMO_ORIGIN)
         path = self.path({"id": DEMO_TENANT_ID}, chat)

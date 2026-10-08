@@ -1,4 +1,4 @@
-# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.1
+# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.2
 
 Plataforma organizada em três módulos:
 

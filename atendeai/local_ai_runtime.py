@@ -34,6 +34,23 @@ def memory_limit_mb():
     return min(limits) if limits else None
 
 
+def cpu_limit_cores():
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if quota != "max" and int(quota) > 0 and int(period) > 0:
+            return round(int(quota) / int(period), 2)
+    except (OSError, ValueError):
+        pass
+    try:
+        quota = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text())
+        period = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text())
+        if quota > 0 and period > 0:
+            return round(quota / period, 2)
+    except (OSError, ValueError):
+        pass
+    return None
+
+
 def extract_cpu_runtime(archive, target):
     import zstandard
     with archive.open("rb") as source, zstandard.ZstdDecompressor().stream_reader(source) as reader:
@@ -124,7 +141,7 @@ class LocalAIRuntime:
         self.state = "iniciando_runtime"
         self.process = subprocess.Popen([str(binary), "serve"], env=env,
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        with httpx.Client(timeout=httpx.Timeout(60, connect=5), follow_redirects=False) as client:
+        with httpx.Client(timeout=httpx.Timeout(60, connect=5), follow_redirects=False, trust_env=False) as client:
             for _ in range(60):
                 if self.stop.is_set() or self.process.poll() is not None:
                     raise InterruptedError()
@@ -152,6 +169,16 @@ class LocalAIRuntime:
                                 raise ValueError("Download do modelo não concluído.")
             if not local_ai_status(self.settings)["pronta"]:
                 raise ValueError("Modelo ainda indisponível após o download.")
+            self.state = "carregando_modelo"
+            logger.warning("IA local: carregando o modelo em memória antes do primeiro atendimento.")
+            response = client.post("http://127.0.0.1:11434/api/chat", timeout=self.settings.local_ai_timeout,
+                                   json={"model": self.settings.local_ai_model, "messages": [], "stream": False,
+                                         "keep_alive": f"{self.settings.local_ai_keep_alive_minutes}m",
+                                         "options": {"num_ctx": self.settings.local_ai_context,
+                                                     "num_thread": self.settings.local_ai_threads}})
+            response.raise_for_status()
+            if response.json().get("done") is not True:
+                raise ValueError("Modelo não terminou de carregar em memória.")
         self.state = "pronta"
         logger.warning("IA local pronta: %s. Inferência sem cobrança por tokens.", self.settings.local_ai_model)
 
