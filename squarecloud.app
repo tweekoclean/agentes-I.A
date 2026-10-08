@@ -1,5 +1,5 @@
 MAIN=main.py
-MEMORY=512
+MEMORY=4096
 VERSION=recommended
 DISPLAY_NAME=AtendeAI
 SUBDOMAIN=atendeai-co
