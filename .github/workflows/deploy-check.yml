@@ -27,17 +27,17 @@ jobs:
                   try:
                       response = client.get(base + "/")
                       response.raise_for_status()
-                      if response.json().get("versao") == "0.5.4":
+                      if response.json().get("versao") == "0.5.5":
                           break
                   except (httpx.HTTPError, ValueError):
                       pass
                   if attempt == 17:
-                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.5.4.")
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.5.5.")
                   time.sleep(5)
               health = client.get(base + "/health")
               health.raise_for_status()
               assert health.json()["status"] == "ok"
-              print("Versão 0.5.4 publicada; banco conectado.")
+              print("Versão 0.5.5 publicada; banco conectado.")
               for route in ("/painel", "/painel/painel.css", "/painel/painel.js"):
                   panel = client.get(base + route)
                   panel.raise_for_status()
@@ -73,6 +73,25 @@ jobs:
                   if attempt == 89:
                       raise SystemExit("A resposta do assistente não ficou disponível.")
                   time.sleep(2)
+              for label, text in (("trivia", "Qual é a capital do Japão?"), ("ameaca", "Vou te matar")):
+                  outgoing = sum(item["direcao"] == "saida" for item in data["mensagens"])
+                  ignored = client.post(path, headers=headers, json={"texto": text, "id_cliente": "smoke-" + label})
+                  ignored.raise_for_status()
+                  identifier = ignored.json()["id"]
+                  for attempt in range(20):
+                      history = client.get(path, headers=headers)
+                      history.raise_for_status()
+                      data = history.json()
+                      item = next(item for item in data["mensagens"] if item["id"] == identifier)
+                      if item["status"] == "ignorada":
+                          assert sum(item["direcao"] == "saida" for item in data["mensagens"]) == outgoing
+                          assert data["conversa"]["estado"] == "bot"
+                          assert not data["conversa"]["aguardando_confirmacao"]
+                          break
+                      if item["status"] == "processada" or attempt == 19:
+                          raise SystemExit("Mensagem fora do atendimento não foi ignorada: " + label)
+                      time.sleep(2)
+              print("Pergunta geral e ameaça ignoradas sem resposta ou encaminhamento.")
               handoff = client.post(path, headers=headers, json={"texto":"[Teste automático de implantação] Quero falar com um atendente.","id_cliente":"smoke-handoff"})
               handoff.raise_for_status()
               for attempt in range(20):

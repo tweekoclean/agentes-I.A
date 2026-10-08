@@ -13,7 +13,8 @@ from .models import (SupportConversation, SupportHandoff, SupportKnowledge, Supp
 from .service import db_insert
 from .support_brain import SupportDecision, decide_support, select_knowledge
 from .support_policy import (ASK_HANDOFF, CONFIRMATION_PREFIX, DECLINE_HANDOFF,
-                             abusive_message, confirmation_reply, explicit_human_request)
+                             abusive_message, clearly_unrelated_message,
+                             confirmation_reply, explicit_human_request)
 
 
 DEMO_TENANT_ID = "00000000-0000-4000-a000-000000000003"
@@ -306,6 +307,11 @@ class SupportService:
             items = [] if reason or decision else session.scalars(select(SupportKnowledge).where(
                 SupportKnowledge.tenant_id == tenant.id, SupportKnowledge.active.is_(True))
                 .order_by(SupportKnowledge.created_at, SupportKnowledge.id).limit(100)).all()
+            business_context = " ".join([tenant.name, *[row.title + " " + row.content for row in items]])
+            if not reason and not decision and clearly_unrelated_message(inbound.text, business_context):
+                inbound.status, inbound.engine = "ignorada", "filtro_assunto"
+                session.commit()
+                return 1
             selected = select_knowledge(items, inbound.text)
             if tenant.ai_enabled and self.settings.ai_configured:
                 # Priorize a pergunta atual e complete com outros fatos da própria empresa.
@@ -321,7 +327,8 @@ class SupportService:
                 select(SupportMessage).where(SupportMessage.conversation_id == conversation.id, SupportMessage.id != inbound.id)
                 .where(SupportMessage.status != "ignorada")
                 .order_by(SupportMessage.created_at.desc()).limit(8)).all())
-                if row.direction != "entrada" or not abusive_message(row.text)]
+                if row.direction != "entrada" or (not abusive_message(row.text) and
+                    not clearly_unrelated_message(row.text, business_context))]
             tenant_id, conversation_id, current_text = tenant.id, conversation.id, inbound.text
             session.commit()
         if not reason and not decision:

@@ -2,6 +2,12 @@
 
 Data: 8 de outubro de 2026 (UTC).
 
+## Filtro de assunto na versão 0.5.5
+
+O teste publicado da 0.5.4 revelou que o modelo respondeu a uma pergunta de geografia fora do negócio. A 0.5.5 acrescenta um filtro antes da inferência para perguntas gerais reconhecíveis, com exceções para temas presentes na base e solicitações comerciais. O modelo também recebe uma ordem explícita de prioridade: ignorar assuntos alheios, oferecer encaminhamento de dúvidas do negócio sem resposta segura e responder com os fatos cadastrados.
+
+115 testes automatizados passaram localmente. Os novos casos verificam silêncio sem consumo de IA, exclusão dessas entradas do contexto, ausência de encaminhamento mesmo com base vazia e preservação de solicitações pertinentes para turismo, educação, entrega e capital de giro. O teste de implantação passa a verificar ameaça e pergunta geral na demonstração publicada. Não há mudança de esquema do banco ou envio real de WhatsApp.
+
 ## Confirmação de encaminhamento e escopo na versão 0.5.4
 
 Os sistemas 1 e 2 são ferramentas comerciais internas da AtendeAI; a integração entregue aos negócios é o sistema 3. O serviço de atendimento agora pergunta se o cliente quer chamar um responsável quando não consegue responder, sem abrir chamado antes da aceitação. “Sim”, “ss” e variações de caixa/pontuação são aceitas. Uma recusa mantém o bot e a confirmação sobrevive a reinícios. O resumo do chamado preserva a dúvida anterior à confirmação.

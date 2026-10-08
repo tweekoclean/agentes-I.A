@@ -375,12 +375,73 @@ class SupportTests(unittest.TestCase):
         self.ai_handler = lambda request: httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
             "role": "assistant", "content": json.dumps({"acao": "ignorar", "texto": "Ignorando.", "referencias": []})}})
         chat = self.chat(tenant)
-        self.send(tenant, chat, "Qual a capital do Japão?")
+        self.send(tenant, chat, "Por que os dinossauros desapareceram?")
         self.service.process_cycle()
         history = self.history(tenant, chat)
         self.assertEqual(len(history["mensagens"]), 2)
         self.assertEqual(history["mensagens"][-1]["status"], "ignorada")
+        self.assertEqual(len(self.ai_calls), 1)
         self.assertEqual(self.tickets(tenant), [])
+
+    def test_general_topics_are_silent_without_ai_and_excluded_from_context(self):
+        tenant = self.tenant(ia_habilitada=True)
+        self.knowledge(tenant)
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        chat = self.chat(tenant)
+        questions = ["Qual é a capital do Japão?", "Conte uma piada", "Quem é o presidente do Brasil?",
+                     "Quem ganhou o jogo?", "Quanto é 2+2?"]
+        for index, question in enumerate(questions):
+            with self.subTest(question=question):
+                self.send(tenant, chat, question, client_id=f"topic-{index}")
+                self.service.process_cycle()
+                history = self.history(tenant, chat)
+                self.assertEqual(history["mensagens"][-1]["status"], "ignorada")
+                self.assertEqual(history["mensagens"][-1]["modo"], "filtro_assunto")
+                self.assertFalse(history["conversa"]["aguardando_confirmacao"])
+        self.assertEqual(self.ai_calls, [])
+        self.assertEqual(self.tickets(tenant), [])
+        self.assertEqual(sum(m["direcao"] == "saida" for m in history["mensagens"]), 1)
+        def handler(request):
+            content = request.content.decode()
+            for question in questions:
+                self.assertNotIn(question, content)
+            return self.ai_result("1")
+        self.ai_handler = handler
+        self.send(tenant, chat, "Qual horário de atendimento?", client_id="business-after-topics")
+        self.service.process_cycle()
+        self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["modo"], "ia")
+
+    def test_topic_filter_works_before_missing_knowledge_handoff(self):
+        tenant = self.tenant(ia_habilitada=True)
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        chat = self.chat(tenant)
+        self.send(tenant, chat, "Qual a capital do Japão?")
+        self.service.process_cycle()
+        history = self.history(tenant, chat)
+        self.assertEqual(history["mensagens"][-1]["status"], "ignorada")
+        self.assertFalse(history["conversa"]["aguardando_confirmacao"])
+        self.assertEqual(self.ai_calls, [])
+        self.assertEqual(self.tickets(tenant), [])
+
+    def test_topic_filter_preserves_relevant_business_requests(self):
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        examples = [
+            ("Agência de Viagens", "Oferecemos serviços turísticos e viagens para o Japão.", "Qual a capital do Japão?"),
+            ("Escola", "Oferecemos aulas de matemática.", "Quanto é 2+2?"),
+            ("Restaurante", "Oferecemos entrega de pedidos.", "Vocês entregam na capital do estado?"),
+            ("Consultoria", "Prestamos consultoria de capital de giro.", "Qual o capital de giro da empresa?"),
+        ]
+        for name, facts, question in examples:
+            with self.subTest(name=name):
+                tenant = self.tenant(name=name, ia_habilitada=True)
+                self.knowledge(tenant, facts)
+                self.ai_handler = lambda request, facts=facts: self.ai_result("1", facts)
+                chat = self.chat(tenant)
+                self.send(tenant, chat, question)
+                self.service.process_cycle()
+                self.assertEqual(self.history(tenant, chat)["mensagens"][-1]["modo"], "ia")
+                self.assertEqual(self.tickets(tenant), [])
+        self.assertEqual(len(self.ai_calls), len(examples))
 
     def test_yes_without_pending_confirmation_does_not_open_human_ticket(self):
         tenant = self.tenant()

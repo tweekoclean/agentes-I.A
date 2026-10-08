@@ -7,6 +7,34 @@ CONFIRMATION_PREFIX = "confirmacao_responsavel:"
 ASK_HANDOFF = "Não consegui responder sua solicitação com segurança. Quer que eu chame um responsável?"
 DECLINE_HANDOFF = "Tudo bem. Podemos continuar por aqui. Qual é sua próxima dúvida?"
 
+# Perguntas gerais reconhecíveis ficam fora do atendimento, exceto quando o
+# próprio negócio trabalha com esse assunto ou a mensagem contém uma solicitação
+# comercial. Os outros assuntos continuam sendo classificados pelo modelo.
+GENERAL_TOPICS = (
+    (r"\bcapital\s+(?:do|da|de)\s+(?!giro\b|empresa\b|negocio\b|sociedade\b|investimento\b)[a-z]",
+     r"\b(?:geografia|turismo|turistic\w*|viagen\w*|escola|ensino|educa\w*)\b"),
+    (r"\b(?:conte|escreva|crie|faca|invente)\b.*\b(?:piada|poema|poesia|conto|historia ficticia)\b",
+     r"\b(?:livr\w*|literatur\w*|editora|poesia|poema|comedia|teatro|escola|ensino)\b"),
+    (r"\b(?:quem|qual)\b.*\b(?:presidente|governador)\s+(?:do|da|dos|de)\s+(?:brasil|estados unidos|sao paulo|portugal)\b",
+     r"\b(?:politic\w*|eleitor\w*|govern\w*|noticia\w*|jornal\w*)\b"),
+    (r"\b(?:quem ganhou|resultado d[oa]|placar d[oa]|qual o melhor)\b.*\b(?:jogo|partida|time|campeonato|copa)\b",
+     r"\b(?:esport\w*|futebol|campeonato|time|noticia\w*|jornal\w*)\b"),
+    (r"\b(?:quanto (?:e|da)|calcule|resolva)\b.*\d\s*[+*/x-]\s*\d",
+     r"\b(?:matematic\w*|escola|ensino|educa\w*|aula\w*)\b"),
+)
+BUSINESS_INTENT = re.compile(
+    r"\b(?:entreg\w*|atend\w*|pedido\w*|servic\w*|compr\w*|produt\w*|orcamento\w*|"
+    r"reserv\w*|agend\w*|preco\w*|pagamento\w*|cardapio\w*|unidade\w*|loja\w*)\b")
+
+
+def clearly_unrelated_message(text, business_context):
+    value = normalize_text(text)
+    if BUSINESS_INTENT.search(value):
+        return False
+    context = normalize_text(business_context)
+    return any(re.search(question, value) and not re.search(related, context)
+               for question, related in GENERAL_TOPICS)
+
 
 def abusive_message(text):
     value = normalize_text(text)

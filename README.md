@@ -1,4 +1,4 @@
-# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.4
+# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.5
 
 Pesquisa e prospecção são ferramentas internas da AtendeAI; as empresas contratantes recebem o atendimento do sistema 3. Consulte [PRODUTO.md](PRODUTO.md) para o fluxo completo, confirmação de encaminhamento e mensagens ignoradas.
 
@@ -12,7 +12,7 @@ Plataforma organizada em três módulos:
 
 Os três agentes usam um modelo aberto hospedado por você, com instruções e permissões distintas. Não fazem chamadas à OpenAI. Veja [IA-LOCAL.md](IA-LOCAL.md) para ativar o Qwen3 na Square Cloud e controlar memória e capacidade. Esta versão inclui os três módulos. O atendimento tem uma base de respostas e conversas por empresa; o WhatsApp usa as credenciais da conta de cada cliente.
 
-Abra [a demonstração do atendimento no site](https://atendeai-co.squareweb.app/demonstracao) para testar as respostas da base e o encaminhamento. A demonstração não ativa o modelo local nem conecta um número WhatsApp.
+Abra [a demonstração do atendimento no site](https://atendeai-co.squareweb.app/demonstracao) para testar as respostas da base e o encaminhamento. O chat usa o modelo local quando a IA está habilitada para a empresa de demonstração; ele não conecta um número WhatsApp.
 
 ## Painel de atendimento
 
