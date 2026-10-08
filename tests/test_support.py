@@ -397,6 +397,31 @@ class SupportTests(unittest.TestCase):
             self.assertEqual(output.status, "envio_incerto")
             self.assertNotIn("fake-support-token", output.error)
 
+    def test_demo_can_answer_a_followup_after_local_ai_is_enabled(self):
+        from atendeai.support import DEMO_TENANT_ID, DEMO_SITE_KEY, DEMO_ORIGIN
+        self.service.ensure_demo()
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
+        updated = self.client.patch(f"/v1/atendimento/empresas/{DEMO_TENANT_ID}", headers=ADMIN,
+                                    json={"ia_habilitada": True})
+        self.assertEqual(updated.status_code, 200)
+        self.ai_handler = lambda request: self.ai_result("00000000-0000-4000-a000-000000000031")
+        self.service.ensure_demo()
+        chat = self.chat({"id": DEMO_TENANT_ID, "chave_site": DEMO_SITE_KEY}, origin=DEMO_ORIGIN)
+        path = self.path({"id": DEMO_TENANT_ID}, chat)
+        headers = {"Origin": DEMO_ORIGIN, "Authorization": "Bearer " + chat["token_conversa"]}
+        for index, question in enumerate(["Como vocês ajudam com meu site?", "E o WhatsApp?"]):
+            sent = self.client.post(path, headers=headers, json={"texto": question, "id_cliente": f"local-demo-{index}"})
+            self.assertEqual(sent.status_code, 200)
+            self.service.process_cycle()
+            history = self.client.get(path, headers=headers).json()
+            self.assertEqual(history["conversa"]["estado"], "bot")
+            self.assertEqual(history["mensagens"][-1]["modo"], "ia")
+        self.assertEqual(len(self.ai_calls), 2)
+        with self.sessions() as session:
+            self.assertEqual(session.scalar(select(SupportQuota)).ai_calls, 2)
+            self.assertTrue(session.get(SupportTenant, DEMO_TENANT_ID).ai_enabled)
+        self.assertEqual(self.calls, [])
+
     def test_demo_is_idempotent_and_never_activates_paid_ai(self):
         from atendeai.support import DEMO_TENANT_ID, DEMO_SITE_KEY, DEMO_ORIGIN
         self.service.ensure_demo()

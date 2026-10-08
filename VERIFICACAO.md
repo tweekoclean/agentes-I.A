@@ -2,6 +2,14 @@
 
 Data: 8 de outubro de 2026 (UTC).
 
+## Correção da demonstração na versão 0.5.1
+
+A demonstração publicada estava com o teto antigo de uma resposta de IA por dia. Depois que a IA local foi ativada, novas perguntas abriram chamados com motivo `limite_ia_diario` antes de chamar o modelo. O cadastro dessa demonstração foi ajustado para 100 respostas por dia, e a conversa mais recente pausada por esse limite foi retomada. O padrão de novas demonstrações agora também é 100; limites individuais escolhidos pelo operador continuam preservados nos reinícios.
+
+Um teste na Square Cloud enviou “Tenho clientes no site e no WhatsApp. Como vocês podem ajudar?” e recebeu resposta no modo `ia`, com a conversa em estado `bot`, sem encaminhamento. A resposta levou aproximadamente 111 segundos nesta hospedagem. O teste comprova geração pelo modelo nesse caso; não comprova atendimento imediato ou capacidade para muitas empresas simultâneas.
+
+97 testes passaram localmente, incluindo uma conversa de demonstração com duas respostas de IA após ativação, sem esgotar o limite na segunda mensagem. A verificação de deploy aceita resposta da base ou da IA local, aguarda a geração e falha caso a pergunta sobre os serviços seja encaminhada. Não houve envio de WhatsApp ou chamada à OpenAI.
+
 ## IA local da versão 0.5
 
 96 testes passaram localmente: os 83 testes existentes adaptados ao protocolo local e 13 testes adicionais de limites, isolamento, status privado, contexto, modelos cloud recusados, ausência de fallback pago e instalação do runtime. Sintaxe do painel/widget e geração do esquema PostgreSQL foram verificadas. Não há mudança de esquema nesta versão.

@@ -27,17 +27,17 @@ jobs:
                   try:
                       response = client.get(base + "/")
                       response.raise_for_status()
-                      if response.json().get("versao") == "0.5.0":
+                      if response.json().get("versao") == "0.5.1":
                           break
                   except (httpx.HTTPError, ValueError):
                       pass
                   if attempt == 17:
-                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.5.0.")
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.5.1.")
                   time.sleep(5)
               health = client.get(base + "/health")
               health.raise_for_status()
               assert health.json()["status"] == "ok"
-              print("Versão 0.5.0 publicada; banco conectado.")
+              print("Versão 0.5.1 publicada; banco conectado.")
               for route in ("/painel", "/painel/painel.css", "/painel/painel.js"):
                   panel = client.get(base + route)
                   panel.raise_for_status()
@@ -62,14 +62,16 @@ jobs:
               headers = {"Origin": base, "Authorization": "Bearer " + session["token_conversa"]}
               question = client.post(path, headers=headers, json={"texto":"Quais serviços vocês oferecem?","id_cliente":"smoke-question"})
               question.raise_for_status()
-              for attempt in range(20):
+              for attempt in range(90):
                   history = client.get(path, headers=headers)
                   history.raise_for_status()
                   data = history.json()
-                  if any(item.get("modo") == "base_sem_ia" for item in data["mensagens"]):
+                  if any(item.get("modo") in {"base_sem_ia", "ia"} and item.get("autor") == "assistente" for item in data["mensagens"]):
                       break
-                  if attempt == 19:
-                      raise SystemExit("A resposta da base não ficou disponível.")
+                  if data["conversa"]["estado"] == "humano":
+                      raise SystemExit("Pergunta sobre serviços encaminhada indevidamente: " + str(data["conversa"].get("motivo_pausa")))
+                  if attempt == 89:
+                      raise SystemExit("A resposta do assistente não ficou disponível.")
                   time.sleep(2)
               handoff = client.post(path, headers=headers, json={"texto":"[Teste automático de implantação] Quero falar com um atendente.","id_cliente":"smoke-handoff"})
               handoff.raise_for_status()
@@ -83,6 +85,6 @@ jobs:
                   if attempt == 19:
                       raise SystemExit("O encaminhamento não foi concluído.")
                   time.sleep(2)
-              print("Chat de demonstração: sessão privada, resposta da base e encaminhamento com IA pausada verificados.")
+              print("Chat de demonstração: sessão privada, resposta do assistente e encaminhamento com IA pausada verificados.")
               print("Teste somente no site; nenhum envio de WhatsApp ou chamada paga de IA.")
           PY

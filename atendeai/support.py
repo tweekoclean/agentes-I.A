@@ -55,7 +55,7 @@ class SupportService:
                 id=DEMO_TENANT_ID, name="AtendeAI — Demonstração", site_key_hash=digest(DEMO_SITE_KEY),
                 allowed_origins=[DEMO_ORIGIN],
                 welcome_text="Olá! Esta é uma demonstração do atendimento da AtendeAI. Pergunte quais serviços oferecemos ou como funciona o encaminhamento para uma pessoa.",
-                active=True, ai_enabled=False, daily_conversation_limit=100, daily_ai_limit=1)
+                active=True, ai_enabled=False, daily_conversation_limit=100, daily_ai_limit=100)
                 .on_conflict_do_nothing(index_elements=["id"]))
             examples = [
                 ("00000000-0000-4000-a000-000000000031", "Serviços da AtendeAI",

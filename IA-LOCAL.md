@@ -15,6 +15,8 @@ O agente é da AtendeAI; o modelo base é o Qwen3, de terceiros, executado pelo 
 
 Diagnóstico autenticado: `GET /v1/ia/status`, com `X-API-Key`. Mostra configuração, download/inicialização e presença do modelo. A consulta não gera texto e não transmite credenciais. Presença do modelo não substitui um teste de conversa. O painel diferencia respostas cadastradas, IA desabilitada, modelo pendente e servidor indisponível.
 
+Se a resposta for encaminhada imediatamente, consulte o motivo do chamado no painel. `limite_ia_diario` indica que o teto de respostas da empresa foi atingido: aumente **Chamadas de IA por dia** em Configuração se houver capacidade. A demonstração nova usa 100 por dia desde a versão 0.5.1; cadastros existentes mantêm as configurações escolhidas pelo operador. Após ajustar, abra **Nova conversa** no chat ou conclua e retome o atendimento pausado. Uma empresa sem itens ativos na base precisa de informações reais cadastradas antes de responder dúvidas sobre o negócio.
+
 ## Memória, qualidade e capacidade
 
 O `qwen3:1.7b` quantizado ocupa cerca de 1,4 GB em pesos, segundo o catálogo oficial. O `qwen3:4b` ocupa cerca de 2,5 GB em pesos; precisa de memória adicional para execução, contexto e API. Tamanho do download não é o consumo total de RAM. O código bloqueia o início do modelo gerenciado quando o limite de memória detectado é inferior ao mínimo de teste previsto. A margem e o desempenho precisam ser verificados na hospedagem real.
