@@ -27,9 +27,9 @@ Adicione respostas reais pela rota `POST /v1/atendimento/empresas/{empresa_id}/b
 {"titulo":"Horário de atendimento","conteudo":"Atendemos de segunda a sexta, das 9h às 18h, no horário de São Paulo.","ativa":true}
 ```
 
-Use itens curtos, com fatos reais da empresa, até 2.000 caracteres. GET lista e PUT atualiza/desativa os itens. Sem IA, perguntas com correspondência na base recebem o texto cadastrado; as demais abrem um chamado. A busca considera até 100 itens ativos. Com IA, fornece até três trechos encontrados ou até dez itens da base pequena quando a pergunta usa outras palavras. Ainda não há busca vetorial de grandes documentos, upload de PDFs nem consulta a sistemas de pedidos.
+Use itens curtos, com fatos reais da empresa, até 2.000 caracteres. GET lista e PUT atualiza/desativa os itens. Sem IA, perguntas com correspondência na base recebem o texto cadastrado; as demais abrem um chamado. A busca considera até 100 itens ativos. Com IA local, prioriza os itens da pergunta e completa o contexto com até cinco itens da própria empresa. Inclui documentos inteiros que cabem no contexto, sem cortar exceções. Ainda não há busca vetorial de grandes documentos, upload de PDFs nem consulta a sistemas de pedidos.
 
-Para ativar a IA, configure OPENAI_API_KEY no ambiente e use PATCH da empresa com `{"ia_habilitada":true}`. O modelo usa OPENAI_MODEL. As chamadas enviam a mensagem, até oito mensagens de contexto e apenas trechos da base daquela empresa; textos digitados podem conter dados pessoais. Tokens da conversa e credenciais do WhatsApp não entram na chamada. A base é fornecida como contexto, sem treinamento do modelo.
+Para ativar a IA, configure o modelo local conforme [IA-LOCAL.md](IA-LOCAL.md) e use PATCH da empresa com `{"ia_habilitada":true}` ou marque o uso de IA no painel. As chamadas enviam a mensagem, até quatro mensagens recentes de contexto e somente fatos da própria empresa ao seu servidor local. Mensagens antigas podem ser removidas para caber no contexto. Tokens da conversa e credenciais do WhatsApp não entram na chamada. A base é fornecida como contexto, sem treinamento do modelo.
 
 O limite diário de IA é reservado no banco antes da chamada, no fuso de São Paulo. Falhas podem consumir a reserva. Ao atingir o teto, o sistema abre um chamado. PATCH também permite alterar limites, origens, boas-vindas ou desativar a empresa.
 
@@ -108,10 +108,14 @@ SAIR interrompe a conversa e cancela textos pendentes. Um “oi” posterior nã
 
 O deploy cria seis novas tabelas sem modificar as existentes. PostgreSQL, certificados e chave administrativa continuam no ambiente. Não execute o SQL completo no banco atual: create_all cria o que falta. O SQL completo é para um banco vazio.
 
-Referências: [política WhatsApp Business](https://business.whatsapp.com/policy), [webhooks da Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint/) e [saída estruturada OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs).
+Referências: [política WhatsApp Business](https://business.whatsapp.com/policy), [webhooks da Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint/) e [saída estruturada local](https://docs.ollama.com/capabilities/structured-outputs).
 
 ## Demonstração pronta
 
 Abra [a demonstração](https://atendeai-co.squareweb.app/demonstracao). Ela usa um cadastro separado chamado AtendeAI — Demonstração, com respostas por regras/base, sem ativação de IA paga ou conta WhatsApp. Pergunte “quais serviços vocês oferecem?” e depois “quero falar com um atendente”. O segundo pedido cria um chamado real na fila dessa empresa de teste e pausa o bot. Use as rotas administrativas da empresa 00000000-0000-4000-a000-000000000003 para consultar/responder.
 
 SUPPORT_DEMO_ENABLED=false desativa a página e a criação inicial da demonstração. A inicialização preserva alterações anteriores e não duplica a empresa/base. Desative também a empresa pela API se desejar bloquear sessões já abertas. O teto padrão é de 100 novas conversas por dia para a demonstração.
+
+## IA local sem OpenAI
+
+A versão 0.5 usa Qwen3 por Ollama, hospedado por você. A ativação e os recursos necessários estão em [IA-LOCAL.md](IA-LOCAL.md). Sem modelo habilitado, a base usa o modo `base_sem_ia`. Com IA local habilitada para a empresa, o modelo elabora respostas a partir dos fatos e histórico; a transferência para o responsável continua salva no banco.

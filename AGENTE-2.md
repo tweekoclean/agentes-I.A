@@ -27,8 +27,8 @@ Cadastre estas variáveis na Square Cloud. Mantenha as variáveis atuais de Post
 | `COMMERCIAL_AUTO_REPLY` | `true` para respostas automáticas; `false` para registrar as entradas e abrir chamados sem responder |
 | `COMMERCIAL_DAILY_LIMIT` | Teto local de tentativas/reservas de abordagem inicial por dia; padrão `100` |
 | `COMMERCIAL_MAX_AUTO_REPLIES` | Respostas automáticas por conversa antes de encaminhar; padrão `6` |
-| `OPENAI_API_KEY` | Opcional para respostas por IA; sem chave, o sistema usa regras limitadas e encaminha outras dúvidas |
-| `OPENAI_MODEL` | Modelo de IA, padrão `gpt-4.1-mini` |
+| `AI_PROVIDER` | `ollama` para IA local; `none` usa regras limitadas e encaminha outras dúvidas |
+| `LOCAL_AI_MODEL` | Modelo aberto local; padrão `qwen3:4b`. Veja [IA-LOCAL.md](IA-LOCAL.md) |
 
 Os segredos ficam no ambiente. Eles não aparecem no status, nas mensagens de erro do cliente Meta nem na representação de `Settings`. Um token temporário pode expirar; uma recusa da Meta fica registrada e não inicia repetição automática.
 

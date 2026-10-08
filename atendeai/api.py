@@ -17,6 +17,8 @@ from .catalog import CITIES, SEGMENTS, resolve_city
 from .commercial import CommercialError, CommercialService
 from .commercial_routes import commercial_routers
 from .config import Settings
+from .local_ai import local_ai_status
+from .local_ai_runtime import LocalAIRuntime
 from .support import SupportService
 from .support_routes import support_routers
 from .database_ssl import DatabaseSSL
@@ -92,6 +94,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
     source = source or (DemoSource() if settings.search_provider == "demo" else OverpassSource(settings.overpass_url))
     commercial = CommercialService(sessions, settings, whatsapp_transport, ai_transport)
     support = SupportService(sessions, settings, whatsapp_transport, ai_transport)
+    runtime = LocalAIRuntime(settings)
 
     async def background_worker(stop, service):
         while not stop.is_set():
@@ -112,6 +115,8 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
             Base.metadata.create_all(engine)
             if settings.support_demo_enabled and settings.environment != "test":
                 support.ensure_demo()
+            if settings.local_ai_autostart and settings.environment != "test":
+                tasks.append(asyncio.create_task(runtime.run()))
             if settings.whatsapp_ready and settings.environment != "test":
                 tasks.append(asyncio.create_task(background_worker(stop, commercial)))
             if settings.environment != "test":
@@ -119,6 +124,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
             yield
         finally:
             stop.set()
+            runtime.request_stop()
             try:
                 if tasks:
                     await asyncio.gather(*tasks)
@@ -126,7 +132,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
                 engine.dispose()
                 ssl_files.close()
 
-    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.4.0", lifespan=lifespan,
+    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.5.0", lifespan=lifespan,
                   description="Pesquisa em São Paulo, conversa comercial e suporte por empresa via site e WhatsApp oficial. O painel está em /painel. Use Authorize com ADMIN_API_KEY nas rotas administrativas; visitantes usam tokens próprios.")
     app.state.settings, app.state.engine, app.state.sessions = settings, engine, sessions
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
@@ -146,6 +152,12 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
     def admin(key: str | None = Depends(key_header)):
         if not key or not secrets.compare_digest(key.encode(), settings.admin_api_key.encode()):
             raise HTTPException(401, "Chave de acesso inválida.")
+
+    @app.get("/v1/ia/status", dependencies=[Depends(admin)], tags=["IA local"])
+    def ai_status():
+        result = local_ai_status(settings, ai_transport)
+        result["inicializacao"] = runtime.state
+        return result
 
     @app.exception_handler(CommercialError)
     async def commercial_error(request, error):
@@ -172,7 +184,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
 
     @app.get("/", tags=["Informações"])
     def index():
-        return {"projeto": "AtendeAI", "versao": "0.4.0", "documentacao": "/docs", "painel": "/painel",
+        return {"projeto": "AtendeAI", "versao": "0.5.0", "documentacao": "/docs", "painel": "/painel",
                 "agentes": {"1_pesquisa": "implementado", "2_comercial": "implementado" if settings.whatsapp_ready else "implementado_configuracao_pendente",
                             "3_atendimento": "implementado"},
                 "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}

@@ -112,9 +112,8 @@ class SupportTests(unittest.TestCase):
         return r
 
     def ai_result(self, item_id, text="O atendimento ocorre das 9h às 18h."):
-        return httpx.Response(200, json={"status": "completed", "output": [
-            {"type": "message", "content": [{"type": "output_text", "text": json.dumps({
-                "acao": "responder", "texto": text, "referencias": [item_id]})}]}]})
+        return httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
+            "role": "assistant", "content": json.dumps({"acao": "responder", "texto": text, "referencias": [item_id]})}})
 
     def test_admin_authentication_origin_validation_and_no_credential_leak(self):
         self.assertEqual(self.client.get("/v1/atendimento/empresas").status_code, 401)
@@ -240,14 +239,15 @@ class SupportTests(unittest.TestCase):
         tenant, other = self.tenant(ia_habilitada=True), self.tenant("Outra empresa")
         self.knowledge(tenant)
         other_item = self.knowledge(other, "Outra empresa: informação exclusiva ABC987.")
-        self.service.settings = replace(self.service.settings, openai_api_key="fake-openai-key")
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
         chat = self.chat(tenant)
         def handler(request):
             body = json.loads(request.content)
-            self.assertFalse(body["store"])
-            self.assertTrue(body["text"]["format"]["strict"])
-            self.assertNotIn("ABC987", body["input"])
-            self.assertNotIn(chat["token_conversa"], body["input"])
+            self.assertEqual(request.url.host, "127.0.0.1")
+            self.assertFalse(body["stream"])
+            self.assertFalse(body["format"]["additionalProperties"])
+            self.assertNotIn("ABC987", body["messages"][1]["content"])
+            self.assertNotIn(chat["token_conversa"], body["messages"][1]["content"])
             return self.ai_result(other_item["id"], "Informação de outra empresa")
         self.ai_handler = handler
         self.send(tenant, chat)
@@ -259,7 +259,7 @@ class SupportTests(unittest.TestCase):
     def test_valid_ai_answer_and_daily_ai_budget(self):
         tenant = self.tenant(ia_habilitada=True, limite_ia_dia=1)
         item = self.knowledge(tenant)
-        self.service.settings = replace(self.service.settings, openai_api_key="fake-openai-key")
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
         self.ai_handler = lambda request: self.ai_result(item["id"])
         first = self.chat(tenant)
         self.send(tenant, first)
@@ -274,7 +274,7 @@ class SupportTests(unittest.TestCase):
     def test_ai_can_use_small_base_for_a_question_with_different_wording(self):
         tenant = self.tenant(ia_habilitada=True)
         item = self.knowledge(tenant)
-        self.service.settings = replace(self.service.settings, openai_api_key="fake-openai-key")
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
         self.ai_handler = lambda request: self.ai_result(item["id"], "Abrimos às 9h.")
         chat = self.chat(tenant)
         self.send(tenant, chat, "Até que horas vocês ficam abertos?")
@@ -285,7 +285,7 @@ class SupportTests(unittest.TestCase):
     def test_knowledge_changed_during_ai_analysis_is_not_sent_as_current_policy(self):
         tenant = self.tenant(ia_habilitada=True)
         item = self.knowledge(tenant)
-        self.service.settings = replace(self.service.settings, openai_api_key="fake-openai-key")
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
         chat = self.chat(tenant)
         def handler(request):
             changed = self.client.put(f"/v1/atendimento/empresas/{tenant['id']}/base/{item['id']}", headers=ADMIN,
@@ -301,7 +301,7 @@ class SupportTests(unittest.TestCase):
     def test_human_takeover_during_ai_analysis_discards_pending_bot_response(self):
         tenant = self.tenant(ia_habilitada=True)
         item = self.knowledge(tenant)
-        self.service.settings = replace(self.service.settings, openai_api_key="fake-openai-key")
+        self.service.settings = replace(self.service.settings, ai_provider="ollama")
         chat = self.chat(tenant)
         def handler(request):
             self.service.human_reply(tenant["id"], chat["conversa"]["id"], "Vou assumir o atendimento.")

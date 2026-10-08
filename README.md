@@ -1,4 +1,4 @@
-# AtendeAI — pesquisa, comercial e atendimento, versão 0.4.0
+# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.0
 
 Plataforma organizada em três módulos:
 
@@ -8,9 +8,9 @@ Plataforma organizada em três módulos:
 | Agente 2 | Apresentar o serviço e acompanhar interessados | Implementado; ativação depende da configuração do WhatsApp oficial |
 | Agente 3 | Atender clientes das empresas pelo site ou WhatsApp | API, chat de site e painel do operador implementados; contas WhatsApp dependem de configuração |
 
-Os módulos podem usar o mesmo provedor de IA, com instruções e permissões distintas. Não é necessário contratar três modelos diferentes. Esta versão inclui os três módulos. O atendimento tem uma base de respostas e conversas por empresa; o WhatsApp usa as credenciais da conta de cada cliente.
+Os três agentes usam um modelo aberto hospedado por você, com instruções e permissões distintas. Não fazem chamadas à OpenAI. Veja [IA-LOCAL.md](IA-LOCAL.md) para ativar o Qwen3 na Square Cloud e controlar memória e capacidade. Esta versão inclui os três módulos. O atendimento tem uma base de respostas e conversas por empresa; o WhatsApp usa as credenciais da conta de cada cliente.
 
-Abra [a demonstração do atendimento no site](https://atendeai-co.squareweb.app/demonstracao) para testar as respostas da base e o encaminhamento. A demonstração não ativa IA paga nem conecta um número WhatsApp.
+Abra [a demonstração do atendimento no site](https://atendeai-co.squareweb.app/demonstracao) para testar as respostas da base e o encaminhamento. A demonstração não ativa o modelo local nem conecta um número WhatsApp.
 
 ## Painel de atendimento
 
@@ -21,7 +21,7 @@ No painel, selecione a empresa e use:
 - **Atendimento:** consultar chamados abertos/resolvidos e conversas, ler o histórico, assumir o atendimento, responder ao cliente e concluir com retomada automática. A fila atualiza a cada 15 segundos, e o histórico aberto a cada 5 segundos enquanto a aba está visível.
 - **Base de respostas:** cadastrar, editar, ativar e desativar informações da empresa.
 - **Configuração:** ajustar boas-vindas, sites permitidos, limites diários e uso de IA; consultar o estado da integração WhatsApp e gerar o código do chat.
-- **Nova empresa:** criar um cadastro de atendimento separado, inicialmente sem IA paga. Guarde o código do chat exibido após o cadastro: a chave pública original não é recuperável. Substituí-la exige confirmação no painel e atualização dos sites incorporados.
+- **Nova empresa:** criar um cadastro de atendimento separado, inicialmente com IA desabilitada. Guarde o código do chat exibido após o cadastro: a chave pública original não é recuperável. Substituí-la exige confirmação no painel e atualização dos sites incorporados.
 
 A chave é administrativa e concede acesso a todas as empresas. Este painel é para o dono/operador da plataforma; não oferece logins individuais de funcionários ou acesso restrito de cada cliente. Contas e permissões individuais serão necessários antes de distribuir o painel às empresas contratantes. Não coloque a chave administrativa no widget de visitantes.
 
@@ -155,11 +155,11 @@ Vercel também suporta FastAPI. Este pacote está preparado diretamente para Squ
 
 ## Análise opcional por IA
 
-Configure `OPENAI_API_KEY` e, se desejar, `OPENAI_MODEL`. O modelo inicial é `gpt-4.1-mini`, configurável. Use `POST /v1/empresas/{id}/analise`.
+Configure o modelo local conforme [IA-LOCAL.md](IA-LOCAL.md) e use `POST /v1/empresas/{id}/analise`.
 
-Com a chave, a API chama a Responses API da OpenAI, exige uma saída JSON estruturada e valida a resposta localmente. Envia o nome, cidade, segmento, presença de canais públicos e horários publicados; não envia o número de telefone nem o endereço de email nessa análise. A análise aponta uma hipótese de benefício e perguntas para validar a necessidade. Ela não altera o contato, o consentimento ou a revisão.
+Com `AI_PROVIDER=ollama`, a API chama seu servidor local, exige uma saída JSON estruturada e valida a resposta. Envia o nome, cidade, segmento, presença de canais públicos e horários publicados; não envia o número de telefone nem o endereço de email nessa análise. A análise aponta uma hipótese de benefício e perguntas para validar a necessidade. Ela não altera o contato, o consentimento ou a revisão.
 
-Sem chave, o endpoint devolve uma análise simples baseada em regras e marca `modo=regras_sem_ia`. A pesquisa real não depende do modelo. Nenhuma chamada de IA paga é realizada apenas por pesquisar uma cidade. As análises são acionadas separadamente; se o WhatsApp estiver habilitado e houver mensagens pendentes de clientes autorizados, o agente comercial também poderá chamar o modelo automaticamente.
+Com `AI_PROVIDER=none`, o endpoint devolve uma análise simples baseada em regras e marca `modo=regras_sem_ia`. A pesquisa real não depende do modelo. As análises são acionadas separadamente; se o WhatsApp estiver habilitado e houver mensagens pendentes de clientes autorizados, o agente comercial também poderá chamar o modelo local automaticamente.
 
 ## Rotas principais
 
@@ -236,6 +236,6 @@ Referências consultadas em 8 de outubro de 2026:
 - [PostgreSQL e certificados na Square Cloud](https://help.squarecloud.app/pt-br/article/como-criar-um-banco-postgresql-e-conectar-ma6gn5/)
 - [Verificação SSL no PostgreSQL](https://www.postgresql.org/docs/current/libpq-ssl.html)
 - [FastAPI na Vercel](https://vercel.com/docs/frameworks/backend/fastapi)
-- [OpenAI Docs: saída estruturada](https://developers.openai.com/api/docs/guides/structured-outputs)
-- [OpenAI Docs: GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
+- [Ollama: saída estruturada](https://docs.ollama.com/capabilities/structured-outputs)
+- [Qwen3 local](https://ollama.com/library/qwen3:1.7b)
 - [Política de mensagens do WhatsApp Business](https://business.whatsapp.com/policy)

@@ -4,7 +4,7 @@
   const root = "/v1/atendimento/empresas";
   const pageSize = 50;
   const state = {
-    key: "", epoch: 0, pending: new Set(), companies: [], tenant: null, view: "inbox",
+    key: "", epoch: 0, pending: new Set(), companies: [], tenant: null, ai: null, view: "inbox",
     queuePage: 1, queueItems: [], queueFingerprint: "", knowledgePage: 1, knowledge: [],
     conversation: null, conversationId: "", historyPage: 1, historyFingerprint: "",
     editingKnowledge: "", siteKeys: new Map(), drafts: new Map(), polling: false, busy: false,
@@ -54,6 +54,7 @@
     state.key = "";
     state.companies = [];
     state.tenant = null;
+    state.ai = null;
     state.conversation = null;
     state.conversationId = "";
     state.siteKeys.clear();
@@ -146,6 +147,7 @@
       page += 1;
     }
     state.companies = companies;
+    state.ai = await api("/v1/ia/status");
     $("company-select").replaceChildren(...companies.map((company) => {
       const option = node("option", "", company.nome + (company.ativa ? "" : " · desativada"));
       option.value = company.id;
@@ -164,7 +166,7 @@
     $("company-caption").textContent = tenant ? tenant.nome : "SEU ESPAÇO DE ATENDIMENTO";
     if (!tenant) return;
     $("automation-status").textContent = !tenant.ativa ? "Empresa desativada" :
-      (tenant.ia_habilitada ? (tenant.ia_configurada ? "IA + base de respostas" : "IA aguardando configuração") : "Base de respostas");
+      (tenant.ia_habilitada ? (state.ai?.pronta ? "IA local ativa" : "IA local aguardando configuração") : "Respostas cadastradas");
     $("whatsapp-status").textContent = tenant.whatsapp_ativo ? "Conectado" : "Aguardando configuração";
     $("conversation-limit").textContent = tenant.limite_conversas_dia.toLocaleString("pt-BR");
   }
@@ -365,8 +367,10 @@
     $("settings-ai-limit").value = tenant.limite_ia_dia;
     $("settings-active").checked = tenant.ativa;
     $("settings-ai").checked = tenant.ia_habilitada;
-    $("ai-help").textContent = tenant.ia_configurada ? "Ao ativar, as chamadas de IA podem gerar cobrança no provedor. O limite diário é aplicado por empresa." :
-      "Configure OPENAI_API_KEY nas variáveis de ambiente para usar IA. Enquanto isso, o atendimento usa respostas cadastradas e encaminha dúvidas para uma pessoa.";
+    const states = { desabilitada: "IA local desabilitada", indisponivel: "Servidor de IA indisponível", modelo_pendente: "Modelo ainda não baixado" };
+    const startup = { aguardando_inicio: "Preparando IA local", baixando_runtime: "Baixando o motor da IA", instalando_runtime: "Instalando o motor da IA", iniciando_runtime: "Iniciando o motor da IA", baixando_modelo: "Baixando o modelo", memoria_insuficiente: "Aumente a memória da aplicação", falha_inicializacao: "Confira os logs da hospedagem", runtime_encerrado: "Reinicie a aplicação e confira os recursos" };
+    $("ai-help").textContent = state.ai?.pronta ? "Modelo local pronto: " + state.ai.modelo + ". Ele elabora respostas com as informações da empresa e o histórico, sem cobrança por tokens. O limite diário controla o uso do servidor." :
+      (startup[state.ai?.inicializacao] || states[state.ai?.estado] || "Verifique a configuração da IA local") + ". Atualize o painel para conferir. Ative o uso de IA nesta empresa depois que o modelo estiver pronto.";
     $("whatsapp-help").textContent = tenant.whatsapp_ativo ? "A conta desta empresa está configurada e habilitada para suporte." : "A conta desta empresa ainda precisa ser configurada e habilitada na API oficial da Meta.";
     $("tenant-reference").value = tenant.id;
     renderIntegration();

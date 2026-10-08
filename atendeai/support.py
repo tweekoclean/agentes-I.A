@@ -98,7 +98,9 @@ class SupportService:
         account = self.account_settings(row.id)
         return {"id": row.id, "nome": row.name, "origens_permitidas": row.allowed_origins,
                 "boas_vindas": row.welcome_text, "ativa": row.active, "ia_habilitada": row.ai_enabled,
-                "ia_configurada": bool(self.settings.openai_api_key), "whatsapp_ativo": account.whatsapp_ready,
+                "ia_configurada": self.settings.ai_configured, "ia_provedor": self.settings.ai_provider,
+                "ia_modelo": self.settings.local_ai_model if self.settings.ai_configured else None,
+                "whatsapp_ativo": account.whatsapp_ready,
                 "limite_conversas_dia": row.daily_conversation_limit, "limite_ia_dia": row.daily_ai_limit}
 
     def create_tenant(self, body):
@@ -275,7 +277,7 @@ class SupportService:
                 reason = "limite_conversa_automatica"
             elif conversation.channel == "whatsapp" and as_utc(inbound.occurred_at) + timedelta(hours=24) <= now:
                 reason = "janela_resposta_encerrada"
-            elif normalized in {"oi", "ola", "bom dia", "boa tarde", "boa noite"}:
+            elif normalized in {"oi", "ola", "bom dia", "boa tarde", "boa noite"} and not (tenant.ai_enabled and self.settings.ai_configured):
                 from .support_brain import SupportDecision
                 decision = SupportDecision(acao="responder", texto=tenant.welcome_text, referencias=[])
                 engine = "boas_vindas"
@@ -283,11 +285,13 @@ class SupportService:
                 SupportKnowledge.tenant_id == tenant.id, SupportKnowledge.active.is_(True))
                 .order_by(SupportKnowledge.created_at, SupportKnowledge.id).limit(100)).all()
             selected = select_knowledge(items, inbound.text)
-            if not selected and tenant.ai_enabled and self.settings.openai_api_key:
-                selected = items[:10]
+            if tenant.ai_enabled and self.settings.ai_configured:
+                # Priorize a pergunta atual e complete com outros fatos da própria empresa.
+                # A base é contexto factual; as respostas são elaboradas pelo modelo.
+                selected = (selected + [item for item in items if item not in selected])[:5]
             if not reason and not decision and not selected:
                 reason = "sem_resposta_na_base"
-            use_ai = bool(selected and tenant.ai_enabled and self.settings.openai_api_key)
+            use_ai = bool(selected and tenant.ai_enabled and self.settings.ai_configured)
             if use_ai and not self.reserve(session, tenant, "ai_calls", tenant.daily_ai_limit):
                 reason, use_ai = "limite_ia_diario", False
             knowledge = [{"id": row.id, "titulo": row.title, "conteudo": row.content} for row in selected]

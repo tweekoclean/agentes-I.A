@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 import json
 import os
 import re
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 from sqlalchemy.engine import make_url
@@ -16,8 +17,16 @@ class Settings:
     overpass_url: str = "https://overpass-api.de/api/interpreter"
     cache_hours: int = 24
     provider_interval_seconds: int = 60
-    openai_api_key: str = field(default="", repr=False)
-    openai_model: str = "gpt-4.1-mini"
+    ai_provider: str = "none"
+    local_ai_url: str = field(default="http://127.0.0.1:11434", repr=False)
+    local_ai_model: str = "qwen3:4b"
+    local_ai_token: str = field(default="", repr=False)
+    local_ai_autostart: bool = False
+    local_ai_directory: str = ".local-ai"
+    local_ai_timeout: int = 120
+    local_ai_context: int = 4096
+    local_ai_max_tokens: int = 512
+    local_ai_threads: int = 2
     database_ssl_pem_b64: str = field(default="", repr=False)
     database_ssl_ca_b64: str = field(default="", repr=False)
     database_ssl_cert_b64: str = field(default="", repr=False)
@@ -48,8 +57,16 @@ class Settings:
             overpass_url=os.getenv("OVERPASS_URL", "https://overpass-api.de/api/interpreter"),
             cache_hours=int(os.getenv("SEARCH_CACHE_HOURS", "24")),
             provider_interval_seconds=int(os.getenv("PROVIDER_INTERVAL_SECONDS", "60")),
-            openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-            openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+            ai_provider=os.getenv("AI_PROVIDER", "none").strip().lower(),
+            local_ai_url=os.getenv("LOCAL_AI_URL", "http://127.0.0.1:11434").rstrip("/"),
+            local_ai_model=os.getenv("LOCAL_AI_MODEL", "qwen3:4b"),
+            local_ai_token=os.getenv("LOCAL_AI_TOKEN", ""),
+            local_ai_autostart=env_bool("LOCAL_AI_AUTOSTART", False),
+            local_ai_directory=os.getenv("LOCAL_AI_DIRECTORY", ".local-ai"),
+            local_ai_timeout=int(os.getenv("LOCAL_AI_TIMEOUT", "120")),
+            local_ai_context=int(os.getenv("LOCAL_AI_CONTEXT", "4096")),
+            local_ai_max_tokens=int(os.getenv("LOCAL_AI_MAX_TOKENS", "512")),
+            local_ai_threads=int(os.getenv("LOCAL_AI_THREADS", "2")),
             database_ssl_pem_b64=os.getenv("DATABASE_SSL_PEM_B64", ""),
             database_ssl_ca_b64=os.getenv("DATABASE_SSL_CA_B64", ""),
             database_ssl_cert_b64=os.getenv("DATABASE_SSL_CERT_B64", ""),
@@ -82,9 +99,40 @@ class Settings:
     def whatsapp_ready(self):
         return self.whatsapp_enabled and not self.whatsapp_missing()
 
+    @property
+    def ai_configured(self):
+        return self.ai_provider == "ollama"
+
+    @property
+    def local_ai_headers(self):
+        return {"Authorization": "Bearer " + self.local_ai_token} if self.local_ai_token else {}
+
     def validated(self):
         if self.environment not in {"development", "production", "test"}:
             raise ValueError("APP_ENV deve ser development, production ou test.")
+        if self.ai_provider not in {"none", "ollama"}:
+            raise ValueError("AI_PROVIDER deve ser none ou ollama. Este projeto usa somente IA local.")
+        endpoint = urlsplit(self.local_ai_url)
+        loopback = endpoint.hostname in {"127.0.0.1", "localhost", "::1"}
+        if (endpoint.scheme not in {"http", "https"} or not endpoint.hostname or endpoint.username
+                or endpoint.password or endpoint.query or endpoint.fragment
+                or (endpoint.scheme == "http" and not loopback)):
+            raise ValueError("LOCAL_AI_URL exige HTTPS ou HTTP em localhost, sem credenciais na URL.")
+        if endpoint.hostname == "ollama.com" or (endpoint.hostname or "").endswith(".ollama.com"):
+            raise ValueError("Use seu servidor local, não o serviço de nuvem da Ollama.")
+        if self.ai_configured and not loopback and not self.local_ai_token:
+            raise ValueError("Seu servidor remoto de IA precisa de LOCAL_AI_TOKEN e proteção de acesso.")
+        if not re.fullmatch(r"[a-zA-Z0-9_.:/-]{1,120}", self.local_ai_model) or "cloud" in self.local_ai_model.lower():
+            raise ValueError("LOCAL_AI_MODEL deve ser um modelo local, sem versões cloud.")
+        if self.local_ai_autostart and (not self.ai_configured or not loopback or endpoint.path not in {"", "/"}
+                or endpoint.port not in {None, 11434} or endpoint.scheme != "http"):
+            raise ValueError("LOCAL_AI_AUTOSTART exige AI_PROVIDER=ollama e http://127.0.0.1:11434.")
+        if self.local_ai_autostart and self.local_ai_model not in {"qwen3:0.6b", "qwen3:1.7b", "qwen3:4b"}:
+            raise ValueError("Autostart suporta qwen3:0.6b, qwen3:1.7b e qwen3:4b. Outros modelos exigem servidor externo.")
+        if not 10 <= self.local_ai_timeout <= 150 or not 2048 <= self.local_ai_context <= 8192:
+            raise ValueError("LOCAL_AI_TIMEOUT deve ser 10 a 150; LOCAL_AI_CONTEXT, 2048 a 8192.")
+        if not 128 <= self.local_ai_max_tokens <= 1024 or not 1 <= self.local_ai_threads <= 8:
+            raise ValueError("LOCAL_AI_MAX_TOKENS deve ser 128 a 1024; LOCAL_AI_THREADS, 1 a 8.")
         if self.search_provider not in {"demo", "overpass"}:
             raise ValueError("SEARCH_PROVIDER deve ser demo ou overpass.")
         if not self.overpass_url.startswith("https://"):

@@ -1,6 +1,20 @@
-# Verificação da versão 0.4.0
+# Verificação das versões 0.4 e 0.5
 
 Data: 8 de outubro de 2026 (UTC).
+
+## IA local da versão 0.5
+
+96 testes passaram localmente: os 83 testes existentes adaptados ao protocolo local e 13 testes adicionais de limites, isolamento, status privado, contexto, modelos cloud recusados, ausência de fallback pago e instalação do runtime. Sintaxe do painel/widget e geração do esquema PostgreSQL foram verificadas. Não há mudança de esquema nesta versão.
+
+O teste de navegador passou em desktop e celular com banco descartável: login, empresas, base, chamado, resposta humana, retomada, isolamento e chave administrativa apenas na memória.
+
+O Ollama v0.40.1 e os pesos do Qwen3 foram baixados e conferidos por SHA-256. O teste real do modelo 1.7B encontrou uma conclusão incorreta sobre horário; por isso, o padrão escolhido é 4B. Com `qwen3:4b`, contexto de 4096 e dois threads, o agente respondeu que a loja não abre no sábado após as 14h quando a base define fechamento às 13h, permitiu a visita no sábado às 10h e escolheu encaminhar uma pergunta de preço ausente da base. Essas três perguntas não eram mensagens prontas cadastradas.
+
+Neste ambiente, a primeira resposta do 4B levou aproximadamente 44,5 s, incluindo carregamento; as seguintes levaram 13,7 s e 17,5 s. `/api/ps` informou aproximadamente 3036 MiB para o modelo carregado. Esse número não inclui toda a aplicação e não é uma medição de desempenho na Square Cloud. 3082 MB oferece pouca margem; o instalador exige pelo menos 4096 MB para esse modelo. Recomendamos testar consumo e latência na hospedagem antes de expandir.
+
+O modelo ainda pode errar. Saída estruturada e IDs de referência não garantem que toda afirmação esteja correta. Os testes cobrem casos específicos, não uma certificação geral de qualidade. A aplicação mantém encaminhamento humano, limites por empresa e uma inferência por vez. Não houve chamada à OpenAI nem envio real de WhatsApp. A IA publicada só inicia após configurar memória e variáveis na hospedagem; a configuração padrão mantém a IA desabilitada.
+
+## Histórico da versão 0.4
 
 - 83 testes automatizados passaram localmente: 18 da pesquisa/API, 12 da configuração SSL, 27 do agente comercial, 23 do atendimento e 3 do painel/acesso administrativo. A versão anterior, 0.3, teve 79 testes aprovados também no GitHub Actions.
 - PEM separado e combinado foram validados com certificados fictícios gerados durante os testes. Chaves incompatíveis e valores Base64 inválidos foram recusados antes da conexão.

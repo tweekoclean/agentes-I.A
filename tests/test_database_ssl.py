@@ -36,7 +36,7 @@ class SettingsSSLTests(unittest.TestCase):
 
     def test_credentials_are_omitted_from_settings_repr(self):
         settings = Settings(database_url=URL, database_ssl_pem_b64="PRIVATE_TEST_VALUE",
-                            admin_api_key="PRIVATE_ADMIN_VALUE", openai_api_key="PRIVATE_AI_VALUE")
+                            admin_api_key="PRIVATE_ADMIN_VALUE", local_ai_token="PRIVATE_AI_VALUE")
         for value in [URL, "PRIVATE_TEST_VALUE", "PRIVATE_ADMIN_VALUE", "PRIVATE_AI_VALUE"]:
             self.assertNotIn(value, repr(settings))
 

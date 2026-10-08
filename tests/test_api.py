@@ -172,14 +172,15 @@ class OtherTests(unittest.TestCase):
 
         def handler(request):
             body = json.loads(request.content)
-            self.assertFalse(body["store"])
-            self.assertEqual(body["text"]["format"]["type"], "json_schema")
-            self.assertNotIn("91234", body["input"])
-            return httpx.Response(200, json={"status": "completed", "output": [{"type": "message", "content": [
-                {"type": "output_text", "text": json.dumps(result)}]}]})
+            self.assertEqual(request.url.host, "127.0.0.1")
+            self.assertFalse(body["stream"])
+            self.assertEqual(body["format"]["type"], "object")
+            self.assertNotIn("91234", body["messages"][1]["content"])
+            return httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
+                "role": "assistant", "content": json.dumps(result)}})
 
         source = OverpassSource("https://example.invalid", httpx.MockTransport(lambda request: httpx.Response(200, json=sample_payload())))
-        settings = Settings(environment="test", database_url="sqlite:///:memory:", admin_api_key=KEY, openai_api_key="fake-test-key")
+        settings = Settings(environment="test", database_url="sqlite:///:memory:", admin_api_key=KEY, ai_provider="ollama")
         with TestClient(create_app(settings, source, httpx.MockTransport(handler))) as client:
             lead_id = client.post("/v1/buscas", headers=HEADERS, json={"segmentos": ["oficinas"]}).json()["empresas_ids"][0]
             response = client.post(f"/v1/empresas/{lead_id}/analise", headers=HEADERS)

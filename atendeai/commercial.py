@@ -61,7 +61,7 @@ class CommercialService:
         return {"envio_ativo": self.settings.whatsapp_ready,
                 "habilitado": self.settings.whatsapp_enabled,
                 "variaveis_pendentes": self.settings.whatsapp_missing(),
-                "ia_configurada": bool(self.settings.openai_api_key),
+                "ia_configurada": self.settings.ai_configured,
                 "respostas_automaticas": self.settings.commercial_auto_reply,
                 "limite_diario_abordagens": self.settings.commercial_daily_limit,
                 "abordagens_tentadas_hoje": quota.opening_attempts if quota else 0,
