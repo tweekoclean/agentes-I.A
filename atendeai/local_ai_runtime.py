@@ -13,6 +13,7 @@ import threading
 import httpx
 
 from .local_ai import local_ai_status
+from .resources import inference_threads, memory_limit_mb
 
 
 VERSION = "0.40.1"
@@ -20,35 +21,6 @@ ARCHIVE_SHA256 = "a7aebbe3dd76ccf1351a56a3e57218ad4863cb5f9a9938c58de87a37555e35
 INSTALL_MARKER = ARCHIVE_SHA256 + ":cpu-2"
 ARCHIVE_URL = f"https://github.com/ollama/ollama/releases/download/v{VERSION}/ollama-linux-amd64.tar.zst"
 logger = logging.getLogger("atendeai.ia_local")
-
-
-def memory_limit_mb():
-    limits = []
-    for name in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
-        try:
-            value = int(Path(name).read_text().strip())
-            if value < 1 << 60:
-                limits.append(value // (1024 * 1024))
-        except (OSError, ValueError):
-            pass
-    return min(limits) if limits else None
-
-
-def cpu_limit_cores():
-    try:
-        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
-        if quota != "max" and int(quota) > 0 and int(period) > 0:
-            return round(int(quota) / int(period), 2)
-    except (OSError, ValueError):
-        pass
-    try:
-        quota = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text())
-        period = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text())
-        if quota > 0 and period > 0:
-            return round(quota / period, 2)
-    except (OSError, ValueError):
-        pass
-    return None
 
 
 def extract_cpu_runtime(archive, target):
@@ -175,7 +147,7 @@ class LocalAIRuntime:
                                    json={"model": self.settings.local_ai_model, "messages": [], "stream": False,
                                          "keep_alive": f"{self.settings.local_ai_keep_alive_minutes}m",
                                          "options": {"num_ctx": self.settings.local_ai_context,
-                                                     "num_thread": self.settings.local_ai_threads}})
+                                                     "num_thread": inference_threads(self.settings)}})
             response.raise_for_status()
             if response.json().get("done") is not True:
                 raise ValueError("Modelo não terminou de carregar em memória.")

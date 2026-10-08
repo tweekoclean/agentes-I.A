@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 
 import httpx
 
+from .resources import inference_threads
+
 
 class LocalAIError(ValueError):
     pass
@@ -46,7 +48,7 @@ def generate_json(settings, instructions, data, schema, transport=None, *, max_t
             "stream": False, "think": False, "format": schema,
             "keep_alive": f"{settings.local_ai_keep_alive_minutes}m",
             "options": {"temperature": 0, "num_ctx": settings.local_ai_context,
-                        "num_predict": output_limit, "num_thread": settings.local_ai_threads}}
+                        "num_predict": output_limit, "num_thread": inference_threads(settings)}}
     if not INFERENCE_SLOT.acquire(timeout=2):
         raise LocalAIError("Servidor local ocupado.")
     try:

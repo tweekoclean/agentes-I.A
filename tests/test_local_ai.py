@@ -19,6 +19,7 @@ from atendeai.api import create_app
 from atendeai.config import Settings
 from atendeai.local_ai import INFERENCE_SLOT, LAST_METRICS, LocalAIError, generate_json, local_ai_status
 from atendeai.local_ai_runtime import LocalAIRuntime, extract_cpu_runtime
+from atendeai.resources import inference_threads
 from atendeai.support_brain import decide_support
 
 KEY = "local-ai-test-key-never-used-in-production"
@@ -171,6 +172,21 @@ class LocalAITests(unittest.TestCase):
                 replace(self.settings, local_ai_keep_alive_minutes=minutes).validated()
         replace(self.settings, local_ai_keep_alive_minutes=30).validated()
 
+    def test_managed_inference_uses_only_available_cpu_up_to_four_threads(self):
+        settings = replace(self.settings, local_ai_autostart=True)
+        with patch("atendeai.resources.os.sched_getaffinity", return_value=set(range(8))):
+            for quota, expected in [(0.5, 1), (1, 1), (1.5, 1), (2, 2), (4, 4), (8, 4), (None, 2)]:
+                with self.subTest(quota=quota), patch("atendeai.resources.cpu_limit_cores", return_value=quota):
+                    self.assertEqual(inference_threads(settings), expected)
+        with patch("atendeai.resources.cpu_limit_cores", return_value=4), \
+             patch("atendeai.resources.os.sched_getaffinity", return_value={0, 1}):
+            self.assertEqual(inference_threads(settings), 2)
+
+    def test_manual_and_remote_inference_preserve_the_configured_thread_count(self):
+        with patch("atendeai.resources.cpu_limit_cores", return_value=4):
+            self.assertEqual(inference_threads(self.settings), 2)
+            self.assertEqual(inference_threads(replace(self.settings, local_ai_autostart=True, local_ai_auto_threads=False)), 2)
+
     def test_runtime_preloads_without_generating_a_customer_message(self):
         runtime = LocalAIRuntime(replace(self.settings, local_ai_autostart=True))
         client = Mock()
@@ -180,7 +196,9 @@ class LocalAITests(unittest.TestCase):
         process.poll.return_value = None
         with patch("atendeai.local_ai_runtime.subprocess.Popen", return_value=process), \
              patch("atendeai.local_ai_runtime.httpx.Client") as factory, \
-             patch("atendeai.local_ai_runtime.local_ai_status", return_value={"pronta": True}):
+             patch("atendeai.local_ai_runtime.local_ai_status", return_value={"pronta": True}), \
+             patch("atendeai.resources.cpu_limit_cores", return_value=4), \
+             patch("atendeai.resources.os.sched_getaffinity", return_value=set(range(4))):
             factory.return_value.__enter__.return_value = client
             runtime.start_and_pull(Path("/fake/ollama"))
         args, kwargs = client.post.call_args
@@ -188,7 +206,15 @@ class LocalAITests(unittest.TestCase):
         self.assertEqual(kwargs["json"]["messages"], [])
         self.assertEqual(kwargs["json"]["keep_alive"], "30m")
         self.assertEqual(kwargs["json"]["options"]["num_ctx"], self.settings.local_ai_context)
+        self.assertEqual(kwargs["json"]["options"]["num_thread"], 4)
         self.assertEqual(runtime.state, "pronta")
+        def generation(request):
+            self.assertEqual(json.loads(request.content)["options"]["num_thread"], 4)
+            return httpx.Response(200, json={"done": True, "done_reason": "stop", "message": {
+                "role": "assistant", "content": '{"texto":"Resposta local"}'}})
+        with patch("atendeai.resources.cpu_limit_cores", return_value=4), \
+             patch("atendeai.resources.os.sched_getaffinity", return_value=set(range(4))):
+            generate_json(runtime.settings, "Fatos", {}, SCHEMA, httpx.MockTransport(generation))
 
     def test_status_distinguishes_unavailable_missing_and_installed_model_without_generation(self):
         for response, state in [(httpx.Response(503), "indisponivel"), (httpx.Response(200, json={"models": []}), "modelo_pendente"),

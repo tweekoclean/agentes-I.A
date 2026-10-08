@@ -18,7 +18,8 @@ from .commercial import CommercialError, CommercialService
 from .commercial_routes import commercial_routers
 from .config import Settings
 from .local_ai import local_ai_status
-from .local_ai_runtime import LocalAIRuntime, cpu_limit_cores, memory_limit_mb
+from .local_ai_runtime import LocalAIRuntime
+from .resources import cpu_limit_cores, inference_threads, memory_limit_mb
 from .support import SupportService
 from .support_routes import support_routers
 from .database_ssl import DatabaseSSL
@@ -132,7 +133,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
                 engine.dispose()
                 ssl_files.close()
 
-    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.5.2", lifespan=lifespan,
+    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.5.3", lifespan=lifespan,
                   description="Pesquisa em São Paulo, conversa comercial e suporte por empresa via site e WhatsApp oficial. O painel está em /painel. Use Authorize com ADMIN_API_KEY nas rotas administrativas; visitantes usam tokens próprios.")
     app.state.settings, app.state.engine, app.state.sessions = settings, engine, sessions
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
@@ -158,7 +159,8 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
         result = local_ai_status(settings, ai_transport)
         result["inicializacao"] = runtime.state
         result["recursos"] = {"memoria_limite_mb": memory_limit_mb(), "cpu_limite_nucleos": cpu_limit_cores(),
-                              "threads_ia": settings.local_ai_threads}
+                              "threads_ia": inference_threads(settings), "threads_configurados": settings.local_ai_threads,
+                              "threads_automaticos": settings.local_ai_auto_threads and settings.local_ai_autostart}
         return result
 
     @app.exception_handler(CommercialError)
@@ -186,7 +188,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
 
     @app.get("/", tags=["Informações"])
     def index():
-        return {"projeto": "AtendeAI", "versao": "0.5.2", "documentacao": "/docs", "painel": "/painel",
+        return {"projeto": "AtendeAI", "versao": "0.5.3", "documentacao": "/docs", "painel": "/painel",
                 "agentes": {"1_pesquisa": "implementado", "2_comercial": "implementado" if settings.whatsapp_ready else "implementado_configuracao_pendente",
                             "3_atendimento": "implementado"},
                 "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}

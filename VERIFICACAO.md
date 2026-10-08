@@ -2,6 +2,16 @@
 
 Data: 8 de outubro de 2026 (UTC).
 
+## Uso da CPU disponível na versão 0.5.3
+
+A versão 0.5.2 publicada respondeu à pergunta de demonstração em 21,4 segundos, contra 40,5 segundos antes dos ajustes. Uma continuação nessa conversa respondeu em 25,6 segundos. As duas respostas usaram o modo `ia`, sem encaminhamento. O diagnóstico detectou quota de quatro núcleos de CPU, mas o modelo continuava limitado a dois threads.
+
+Na comparação local adicional, com o modelo pré-carregado antes de cada medição, dois threads levaram 47,42 segundos e quatro threads 20,11 segundos para a mesma pergunta e o mesmo texto de resposta, com 498 tokens de entrada e 64 de saída em ambos os casos. A carga da máquina varia; esse teste motivou medir também o uso dos quatro núcleos na hospedagem.
+
+A versão 0.5.3 escolhe automaticamente até quatro threads apenas para o modelo gerenciado na mesma máquina, respeitando a quota e afinidade de CPU. Servidores remotos, modo manual e ambientes sem quota identificável mantêm `LOCAL_AI_THREADS`. O pré-carregamento usa a mesma quantidade escolhida pela geração. Não houve alteração de banco, limite comercial ou envio de WhatsApp.
+
+104 testes automatizados passaram localmente, incluindo quotas fracionárias, redução por afinidade de CPU, limite de quatro threads e preservação da configuração manual/remota. O mesmo número de threads é verificado no pré-carregamento e na chamada de geração.
+
 ## Redução de latência na versão 0.5.2
 
 O teste anterior à alteração, no chat público da Square Cloud, respondeu em modo `ia` após 40,5 segundos. A versão 0.5.2 pré-carrega o modelo no início, mantém os pesos em memória por 30 minutos após uso, compacta o contexto e reconverte referências curtas para os IDs reais dos documentos da própria empresa. O suporte limita a geração a 256 tokens. Não há cache de respostas prontas; o modelo continua elaborando cada resposta e a validação de contexto, referências e intervenção humana continua ativa.

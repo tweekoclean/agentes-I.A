@@ -27,6 +27,7 @@ class Settings:
     local_ai_context: int = 4096
     local_ai_max_tokens: int = 512
     local_ai_threads: int = 2
+    local_ai_auto_threads: bool = True
     local_ai_keep_alive_minutes: int = 30
     database_ssl_pem_b64: str = field(default="", repr=False)
     database_ssl_ca_b64: str = field(default="", repr=False)
@@ -68,6 +69,7 @@ class Settings:
             local_ai_context=int(os.getenv("LOCAL_AI_CONTEXT", "4096")),
             local_ai_max_tokens=int(os.getenv("LOCAL_AI_MAX_TOKENS", "512")),
             local_ai_threads=int(os.getenv("LOCAL_AI_THREADS", "2")),
+            local_ai_auto_threads=env_bool("LOCAL_AI_AUTO_THREADS", True),
             local_ai_keep_alive_minutes=int(os.getenv("LOCAL_AI_KEEP_ALIVE_MINUTES", "30")),
             database_ssl_pem_b64=os.getenv("DATABASE_SSL_PEM_B64", ""),
             database_ssl_ca_b64=os.getenv("DATABASE_SSL_CA_B64", ""),
