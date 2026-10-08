@@ -1,0 +1,183 @@
+/* Fluxo real de navegador contra SQLite descartável, sem Meta ou IA paga. */
+const assert = require("node:assert/strict");
+const { spawn } = require("node:child_process");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const { chromium } = require("playwright");
+const KEY = "browser-test-administrative-key-not-a-real-secret";
+const port = process.env.PANEL_TEST_PORT || "8136";
+const base = "http://127.0.0.1:" + port;
+const output = process.env.PANEL_TEST_OUTPUT || "/tmp/atendeai-panel-check";
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let serverOutput = "";
+const server = spawn(process.env.PYTHON_BIN || "python3", ["-m", "uvicorn", "browser_server:app", "--app-dir", "tests", "--host", "127.0.0.1", "--port", port, "--log-level", "warning"], {
+  cwd: path.resolve(__dirname, ".."), env: { ...process.env, PANEL_TEST_PORT: port }, stdio: ["ignore", "pipe", "pipe"],
+});
+server.stdout.on("data", (chunk) => { serverOutput += chunk; });
+server.stderr.on("data", (chunk) => { serverOutput += chunk; });
+let browser;
+async function waitFor(work, description) {
+  for (let i = 0; i < 80; i++) {
+    if (await work()) return;
+    await delay(250);
+  }
+  throw new Error("Não concluído: " + description);
+}
+async function get(route, administrative = false) {
+  const response = await fetch(base + route, { headers: administrative ? { "X-API-Key": KEY } : {} });
+  assert.equal(response.status, 200, "GET " + route);
+  return response.json();
+}
+async function visible(page, selector) { await page.locator(selector).waitFor({ state: "visible", timeout: 20000 }); }
+async function noOverflow(page, label) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  assert.equal(overflow, false, label + " cabe na tela");
+}
+
+(async () => {
+  await fs.mkdir(output, { recursive: true });
+  await waitFor(async () => { try { return (await fetch(base + "/health")).ok; } catch { return false; } }, "inicialização do servidor");
+  const fixtures = await get("/__test__/fixtures");
+  const errors = [];
+  browser = await chromium.launch({ headless: true,
+    ...(process.env.PANEL_CHROME_PATH ? { executablePath: process.env.PANEL_CHROME_PATH } : {}),
+    ...(process.env.PANEL_CHROME_ARGS ? { args: JSON.parse(process.env.PANEL_CHROME_ARGS) } : {}),
+  });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const panel = await context.newPage();
+  panel.on("pageerror", (error) => errors.push(error.message));
+  await panel.goto(base + "/painel");
+  await visible(panel, "#login-screen");
+  await noOverflow(panel, "Login desktop");
+  await panel.screenshot({ path: path.join(output, "login-desktop.png"), fullPage: true });
+  await panel.locator("#admin-key").fill("incorrect-administrative-key");
+  await panel.locator("#login-submit").click();
+  await visible(panel, "#login-error");
+  assert.equal(await panel.locator("#app-screen").isVisible(), false);
+  await panel.locator("#admin-key").fill(KEY);
+  await panel.locator("#login-submit").click();
+  await visible(panel, "#app-screen");
+  await waitFor(async () => (await panel.locator("#company-select").inputValue()) === fixtures.first.id, "empresa inicial");
+  assert.equal(await panel.locator("#admin-key").inputValue(), "");
+  assert.equal(await panel.evaluate((key) => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(key), KEY), false);
+
+  // Cliente no widget: pergunta da base, pedido de humano e resposta do operador.
+  const visitorContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const visitor = await visitorContext.newPage();
+  visitor.on("pageerror", (error) => errors.push(error.message));
+  await visitor.goto(base + "/teste-atendimento?" + new URLSearchParams({ empresa: fixtures.first.id, chave: fixtures.first.chave_site }));
+  await visitor.getByRole("button", { name: "Atendimento", exact: true }).click();
+  await visitor.getByRole("textbox", { name: "Sua mensagem" }).fill("Qual o horário de atendimento?");
+  await visitor.getByRole("button", { name: "Enviar", exact: true }).click();
+  await visitor.getByText("Atendemos de segunda a sexta, das 9h às 18h.", { exact: true }).waitFor({ timeout: 20000 });
+  await visitor.getByRole("textbox", { name: "Sua mensagem" }).fill("Quero falar com um atendente.");
+  await visitor.getByRole("button", { name: "Enviar", exact: true }).click();
+  await visitor.getByText("Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento.", { exact: true }).waitFor({ timeout: 20000 });
+  await panel.locator("#refresh").click();
+  await visible(panel, ".queue-item");
+  await panel.locator(".queue-item").first().click();
+  await waitFor(async () => (await panel.locator("#conversation-state").textContent()) === "Com responsável", "histórico do chamado");
+  const malicious = '<img src=x onerror="window.__xss=true">';
+  const manual = "Olá! Aqui é o responsável. Vou verificar sua solicitação. " + malicious;
+  await panel.locator("#reply-text").fill(manual);
+  await panel.locator("#reply-submit").click();
+  await visitor.getByText(manual, { exact: true }).waitFor({ timeout: 20000 });
+  assert.equal(await panel.evaluate(() => Boolean(window.__xss)), false);
+  assert.equal(await visitor.evaluate(() => Boolean(window.__xss)), false);
+  assert.equal(await panel.locator("#conversation-state").textContent(), "Com responsável");
+  await noOverflow(panel, "Atendimento desktop");
+  await panel.screenshot({ path: path.join(output, "atendimento-desktop.png"), fullPage: true });
+  await panel.locator("#resume-bot").click();
+  await waitFor(async () => (await panel.locator("#conversation-state").textContent()) === "Automático", "retomada do bot");
+  const tickets = await get("/v1/atendimento/empresas/" + fixtures.first.id + "/chamados", true);
+  assert.equal(tickets.chamados.length, 0, "Chamado concluído");
+  await visitor.getByRole("textbox", { name: "Sua mensagem" }).fill("Qual o horário de atendimento?");
+  await visitor.getByRole("button", { name: "Enviar", exact: true }).click();
+  await waitFor(async () => (await visitor.getByText("Atendemos de segunda a sexta, das 9h às 18h.", { exact: true }).count()) === 2, "bot responde depois da retomada");
+
+  // Base: cadastrar, editar e desativar; dados de outra empresa ficam separados.
+  await panel.locator('[data-view="knowledge"]').click();
+  await visible(panel, ".knowledge-card");
+  await panel.locator("#add-knowledge").click();
+  await panel.locator("#knowledge-title").fill("Serviços " + malicious);
+  await panel.locator("#knowledge-text").fill("Fazemos revisão e troca de óleo. " + malicious);
+  await panel.locator('#knowledge-form button[type="submit"]').click();
+  await waitFor(async () => (await panel.locator(".knowledge-card").count()) === 2, "cadastro de resposta");
+  assert.equal(await panel.evaluate(() => Boolean(window.__xss)), false);
+  const card = panel.locator(".knowledge-card").filter({ has: panel.getByRole("heading", { name: "Serviços " + malicious, exact: true }) });
+  await card.getByRole("button", { name: "Editar resposta" }).click();
+  await panel.locator("#knowledge-text").fill("Revisão de veículos com agendamento.");
+  await panel.locator('#knowledge-form button[type="submit"]').click();
+  await card.getByText("Revisão de veículos com agendamento.", { exact: true }).waitFor();
+  await card.getByRole("button", { name: "Desativar", exact: true }).click();
+  await card.getByText("Desativada", { exact: true }).waitFor();
+  await panel.locator("#company-select").selectOption(fixtures.second.id);
+  await visible(panel, ".knowledge-card");
+  await panel.getByRole("heading", { name: "Resposta exclusiva da Aurora", exact: true }).waitFor();
+  assert.equal(await panel.getByRole("heading", { name: "Serviços " + malicious, exact: true }).count(), 0);
+
+  // Cadastro e configuração: código do widget, link de teste e substituição deliberada.
+  await panel.locator("#create-company").click();
+  await panel.locator("#new-name").fill("Empresa de teste " + malicious);
+  await panel.locator("#new-origins").fill("https://empresa.example.invalid");
+  await panel.locator('#company-form button[type="submit"]').click();
+  await visible(panel, "#integration-code");
+  const newId = await panel.locator("#tenant-reference").inputValue();
+  const integration = await panel.locator("#integration-code").textContent();
+  assert(integration.includes(newId));
+  assert.equal(integration.includes(KEY), false);
+  assert.equal(await panel.evaluate(() => Boolean(window.__xss)), false);
+  assert.equal(await panel.locator("#settings-ai").isChecked(), false);
+  await panel.locator("#settings-conversations").fill("25");
+  await panel.locator('#settings-form button[type="submit"]').click();
+  await waitFor(async () => (await panel.locator("#conversation-limit").textContent()) === "25", "salvar limites");
+  await noOverflow(panel, "Configuração desktop");
+  await panel.screenshot({ path: path.join(output, "configuracao-desktop.png"), fullPage: true });
+  await panel.locator("#rotate-site-key").click();
+  assert.equal(await panel.locator("#integration-code").textContent(), integration);
+  await panel.locator("#rotate-dialog .close-dialog.button").click();
+  assert.equal(await panel.locator("#integration-code").textContent(), integration);
+  await panel.locator("#rotate-site-key").click();
+  await panel.locator("#confirm-rotate").click();
+  await waitFor(async () => (await panel.locator("#integration-code").textContent()) !== integration, "substituição de chave");
+  const testLink = await panel.locator("#test-company").getAttribute("href");
+  assert(testLink.includes(newId));
+  assert.equal(testLink.includes(KEY), false);
+
+  // Layout móvel, saída e recarga: nenhuma chave administrativa persistida.
+  await panel.setViewportSize({ width: 390, height: 844 });
+  await noOverflow(panel, "Configuração móvel");
+  await panel.screenshot({ path: path.join(output, "configuracao-mobile.png"), fullPage: true });
+  await panel.locator("#company-select").selectOption(fixtures.first.id);
+  await panel.locator('[data-view="inbox"]').click();
+  await panel.locator("#queue-filter").selectOption("conversas");
+  await visible(panel, ".queue-item");
+  await panel.locator(".queue-item").first().click();
+  await visible(panel, "#conversation-content");
+  await noOverflow(panel, "Atendimento móvel");
+  await panel.screenshot({ path: path.join(output, "atendimento-mobile.png"), fullPage: true });
+  await panel.locator("#logout").click();
+  await visible(panel, "#login-screen");
+  assert.equal(await panel.locator("#message-list").textContent(), "");
+  assert.equal(await panel.evaluate((key) => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(key), KEY), false);
+  await panel.reload();
+  await visible(panel, "#login-screen");
+  await noOverflow(panel, "Login móvel");
+  await panel.screenshot({ path: path.join(output, "login-mobile.png"), fullPage: true });
+  assert.deepEqual(errors, [], "Sem erros de JavaScript no painel ou widget");
+  console.log("Painel verificado em desktop e celular: login, empresa, base, isolamento, chamado, resposta humana, retomada e chave apenas em memória.");
+  console.log("Testes com empresas fictícias; nenhum envio real de WhatsApp ou consumo de IA.");
+})().catch(async (error) => {
+  if (browser) {
+    const pages = browser.contexts().flatMap((context) => context.pages());
+    for (let index = 0; index < pages.length; index++) {
+      await pages[index].screenshot({ path: path.join(output, "falha-" + index + ".png"), fullPage: true }).catch(() => {});
+    }
+  }
+  console.error(error);
+  if (serverOutput) console.error(serverOutput);
+  process.exitCode = 1;
+}).finally(async () => {
+  if (browser) await browser.close();
+  server.kill("SIGTERM");
+});

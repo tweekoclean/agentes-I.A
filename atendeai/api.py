@@ -21,6 +21,7 @@ from .support import SupportService
 from .support_routes import support_routers
 from .database_ssl import DatabaseSSL
 from .models import Base, ConsentEvent, Lead, as_utc, build_database, utcnow
+from .panel_routes import panel_router
 from .research import AnalysisError, analyze
 from .service import run_search, serialize_lead
 from .sources import DemoSource, OverpassSource, SourceBusy, SourceError, normalize_phone
@@ -125,13 +126,21 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
                 engine.dispose()
                 ssl_files.close()
 
-    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.3.0", lifespan=lifespan,
-                  description="Pesquisa em São Paulo capital e interior e agente comercial via WhatsApp oficial. Configure o número e as credenciais antes de habilitar o envio. Use Authorize com ADMIN_API_KEY.")
+    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.4.0", lifespan=lifespan,
+                  description="Pesquisa em São Paulo, conversa comercial e suporte por empresa via site e WhatsApp oficial. O painel está em /painel. Use Authorize com ADMIN_API_KEY nas rotas administrativas; visitantes usam tokens próprios.")
     app.state.settings, app.state.engine, app.state.sessions = settings, engine, sessions
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
                        allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "X-Site-Key"])
     app.state.commercial = commercial
     app.state.support = support
+    app.include_router(panel_router())
+
+    @app.middleware("http")
+    async def private_api_responses(request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/v1/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
     key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
     def admin(key: str | None = Depends(key_header)):
@@ -163,7 +172,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
 
     @app.get("/", tags=["Informações"])
     def index():
-        return {"projeto": "AtendeAI", "versao": "0.3.0", "documentacao": "/docs",
+        return {"projeto": "AtendeAI", "versao": "0.4.0", "documentacao": "/docs", "painel": "/painel",
                 "agentes": {"1_pesquisa": "implementado", "2_comercial": "implementado" if settings.whatsapp_ready else "implementado_configuracao_pendente",
                             "3_atendimento": "implementado"},
                 "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}

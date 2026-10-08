@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Painel · AtendeAI</title>
+  <link rel="stylesheet" href="/painel/painel.css">
+  <script src="/painel/painel.js" defer></script>
+</head>
+<body>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <main id="login-screen" class="login-screen">
+    <section class="login-story">
+      <a class="brand" href="/painel"><span class="brand-mark" aria-hidden="true">a</span>AtendeAI</a>
+      <div class="story-copy"><span class="eyebrow">ATENDIMENTO, EM UM SÓ LUGAR</span>
+        <h1>Uma boa conversa<br>começa com atenção.</h1>
+        <p>Organize as respostas da sua empresa, acompanhe os chamados e entre na conversa quando o cliente precisar de você.</p>
+        <div class="story-note"><span class="status-dot" aria-hidden="true"></span>Automação com uma pessoa por perto.</div>
+      </div>
+      <p class="story-footer">Seu espaço para cuidar de cada atendimento.</p>
+    </section>
+    <section class="login-card">
+      <span class="eyebrow">PAINEL DO OPERADOR</span><h2>Vamos começar.</h2>
+      <p>Entre para acompanhar suas empresas e conversas.</p>
+      <form id="login-form">
+        <label for="admin-key">Chave administrativa</label>
+        <input id="admin-key" name="admin-key" type="password" autocomplete="off" spellcheck="false" required placeholder="Informe sua ADMIN_API_KEY">
+        <p class="field-help">Use o valor de ADMIN_API_KEY nas variáveis de ambiente da Square Cloud. A chave fica apenas na memória desta aba.</p>
+        <p id="login-error" class="inline-error" role="alert" hidden></p>
+        <button id="login-submit" class="button primary" type="submit">Entrar no painel <span aria-hidden="true">→</span></button>
+      </form>
+      <a class="text-link" href="/demonstracao" target="_blank" rel="noopener noreferrer">Abrir a demonstração do chat ↗</a>
+    </section>
+  </main>
+
+  <div id="app-screen" class="app-shell" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="/painel"><span class="brand-mark" aria-hidden="true">a</span>AtendeAI</a>
+      <div class="company-picker"><label for="company-select">EMPRESA DE ATENDIMENTO</label><select id="company-select" aria-label="Empresa de atendimento"></select></div>
+      <button id="create-company" class="button secondary new-company" type="button">+ Nova empresa</button>
+      <nav class="nav" aria-label="Painel">
+        <button class="nav-button active" data-view="inbox" type="button" aria-current="page"><span aria-hidden="true">◉</span>Atendimento</button>
+        <button class="nav-button" data-view="knowledge" type="button"><span aria-hidden="true">▤</span>Base de respostas</button>
+        <button class="nav-button" data-view="settings" type="button"><span aria-hidden="true">⚙</span>Configuração</button>
+      </nav>
+      <div class="sidebar-bottom"><a href="/demonstracao" target="_blank" rel="noopener noreferrer">Testar demonstração ↗</a><a href="/docs" target="_blank" rel="noopener noreferrer">Documentação da API ↗</a><button id="logout" type="button">Sair do painel</button><small>AtendeAI · versão 0.4</small></div>
+    </aside>
+    <main class="workspace">
+      <header class="workspace-header"><div><span class="eyebrow" id="company-caption">SEU ESPAÇO DE ATENDIMENTO</span><h1 id="view-title">Atendimento</h1></div><div class="header-actions"><span class="private-badge"><span class="status-dot" aria-hidden="true"></span>Acesso administrativo</span><button id="refresh" class="button secondary" type="button">↻ Atualizar</button></div></header>
+      <p id="load-error" class="inline-error" role="alert" hidden></p>
+      <section id="no-company" class="empty large-empty" hidden><span class="empty-symbol" aria-hidden="true">+</span><h2>Cadastre sua primeira empresa.</h2><p>Crie um espaço de atendimento para organizar respostas e receber conversas.</p><button id="create-first-company" class="button primary" type="button">Cadastrar empresa</button></section>
+      <div id="company-workspace">
+        <div class="overview"><div><span class="overview-label">AUTOMAÇÃO</span><strong id="automation-status">—</strong></div><div><span class="overview-label">WHATSAPP</span><strong id="whatsapp-status">—</strong></div><div><span class="overview-label">NOVAS CONVERSAS POR DIA</span><strong id="conversation-limit">—</strong></div></div>
+        <section id="view-inbox" class="view">
+          <div class="section-intro"><p>Acompanhe os pedidos e continue a conversa quando necessário.</p><span id="last-updated" class="muted"></span></div>
+          <div class="inbox-grid">
+            <section class="card queue-card" aria-label="Fila de atendimento"><div class="card-heading"><h2>Conversas</h2><span id="queue-count" class="count">0</span></div>
+              <label class="visually-hidden" for="queue-filter">Filtrar conversas</label><select id="queue-filter"><option value="aberto">Chamados abertos</option><option value="conversas">Todas as conversas</option><option value="resolvido">Chamados resolvidos</option><option value="interrompido">Chamados interrompidos</option></select>
+              <div id="queue-list" class="queue-list"></div><div class="pagination"><button id="queue-prev" type="button" class="button quiet">← Anterior</button><span id="queue-page" class="muted">Página 1</span><button id="queue-next" type="button" class="button quiet">Próxima →</button></div>
+            </section>
+            <section class="card conversation-card" aria-label="Conversa selecionada">
+              <div id="conversation-empty" class="empty"><span class="empty-symbol" aria-hidden="true">☏</span><h2>Cada conversa importa.</h2><p>Selecione um chamado para ver o histórico e responder ao cliente.</p></div>
+              <div id="conversation-content" hidden>
+                <div class="conversation-heading"><div><h2 id="conversation-title">Conversa</h2><p id="conversation-meta" class="muted"></p></div><span id="conversation-state" class="badge"></span></div>
+                <div class="conversation-actions"><button id="take-over" class="button secondary" type="button">Assumir atendimento</button><button id="resume-bot" class="button secondary" type="button">Concluir e retomar automático</button></div>
+                <div id="message-list" class="message-list" aria-label="Histórico de mensagens"></div>
+                <div class="history-pages"><button id="history-older" class="button quiet" type="button">← Mais antigas</button><span id="history-page" class="muted"></span><button id="history-newer" class="button quiet" type="button">Mais recentes →</button></div>
+                <form id="reply-form" class="reply-form"><label for="reply-text">Sua resposta</label><textarea id="reply-text" rows="3" maxlength="2000" required placeholder="Escreva para o cliente…"></textarea><div class="reply-footer"><span id="reply-help" class="field-help">Ao responder, o atendimento automático fica pausado.</span><button id="reply-submit" class="button primary" type="submit">Enviar resposta →</button></div></form>
+              </div>
+            </section>
+          </div>
+        </section>
+        <section id="view-knowledge" class="view" hidden>
+          <div class="section-intro"><p>Cadastre informações reais que o assistente pode usar nas respostas.</p><button id="add-knowledge" class="button primary" type="button">+ Nova resposta</button></div>
+          <div id="knowledge-list" class="knowledge-grid"></div><div class="pagination"><button id="knowledge-prev" class="button secondary" type="button">← Anterior</button><span id="knowledge-page" class="muted">Página 1</span><button id="knowledge-next" class="button secondary" type="button">Próxima →</button></div>
+        </section>
+        <section id="view-settings" class="view settings-grid" hidden>
+          <section class="card settings-card"><div class="card-heading"><h2>Preferências da empresa</h2></div><form id="settings-form">
+            <label for="settings-welcome">Mensagem de boas-vindas</label><textarea id="settings-welcome" rows="3" maxlength="2000" required></textarea>
+            <label for="settings-origins">Sites permitidos</label><textarea id="settings-origins" rows="3" placeholder="https://www.suaempresa.com"></textarea><p class="field-help">Uma origem por linha: endereço HTTPS sem caminho. Adicione o endereço desta API para usar a página de teste.</p>
+            <div class="form-row"><div><label for="settings-conversations">Novas conversas por dia</label><input id="settings-conversations" type="number" min="1" max="10000" required></div><div><label for="settings-ai-limit">Chamadas de IA por dia</label><input id="settings-ai-limit" type="number" min="1" max="10000" required></div></div>
+            <label class="check-label"><input id="settings-active" type="checkbox">Empresa ativa para atendimento</label><label class="check-label"><input id="settings-ai" type="checkbox">Usar IA para elaborar respostas</label><p id="ai-help" class="field-help"></p><button class="button primary" type="submit">Salvar preferências</button>
+          </form></section>
+          <div class="settings-side"><section class="card settings-card"><div class="card-heading"><h2>Chat no seu site</h2></div><p class="field-help">Inclua este código antes de fechar o body do site.</p><p id="integration-help" class="field-help"></p><pre id="integration-code" class="code-block" hidden></pre><div class="integration-actions"><button id="copy-integration" class="button secondary" type="button" hidden>Copiar código</button><a id="test-company" class="button secondary" target="_blank" rel="noopener noreferrer" hidden>Testar chat ↗</a><button id="rotate-site-key" class="button quiet" type="button">Substituir chave do site</button></div></section>
+          <section class="card settings-card"><div class="card-heading"><h2>Conectar o WhatsApp</h2></div><p id="whatsapp-help" class="field-help"></p><p class="field-help">As credenciais e os certificados continuam nas variáveis de ambiente da Square Cloud.</p><a class="text-link" href="https://github.com/tweekoclean/agentes-I.A/blob/main/AGENTE-3.md#whatsapp-de-cada-empresa" target="_blank" rel="noopener noreferrer">Ver configuração do WhatsApp ↗</a><label for="tenant-reference">Identificador da empresa</label><input id="tenant-reference" readonly></section></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="company-dialog"><form id="company-form"><div class="dialog-heading"><div><span class="eyebrow">NOVO ESPAÇO</span><h2>Cadastrar empresa</h2></div><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><label for="new-name">Nome da empresa</label><input id="new-name" minlength="2" maxlength="200" required placeholder="Ex.: Oficina Horizonte"><label for="new-origins">Site da empresa</label><textarea id="new-origins" rows="2" placeholder="https://www.suaempresa.com"></textarea><p class="field-help">Uma origem HTTPS por linha, sem caminho. Você pode configurar o site depois.</p><label class="check-label"><input id="new-allow-test" type="checkbox" checked>Permitir também o chat de teste nesta API</label><label for="new-welcome">Mensagem de boas-vindas</label><textarea id="new-welcome" rows="3" maxlength="2000" required>Olá! Sou o assistente virtual de atendimento. Como posso ajudar?</textarea><p class="field-help">O cadastro começa com respostas da base e limite de 100 novas conversas por dia. Você pode alterar nas preferências.</p><p id="company-form-error" class="inline-error" role="alert" hidden></p><div class="dialog-footer"><button class="close-dialog button secondary" type="button">Cancelar</button><button class="button primary" type="submit">Cadastrar empresa</button></div></form></dialog>
+  <dialog id="knowledge-dialog"><form id="knowledge-form"><div class="dialog-heading"><h2 id="knowledge-form-title">Nova resposta</h2><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><label for="knowledge-title">Assunto</label><input id="knowledge-title" minlength="2" maxlength="200" required placeholder="Ex.: Horário de atendimento"><label for="knowledge-text">Resposta cadastrada</label><textarea id="knowledge-text" rows="7" maxlength="2000" required placeholder="Informe os horários, condições ou informações reais da empresa."></textarea><label class="check-label"><input id="knowledge-active" type="checkbox" checked>Disponível para respostas automáticas</label><p id="knowledge-form-error" class="inline-error" role="alert" hidden></p><div class="dialog-footer"><button class="close-dialog button secondary" type="button">Cancelar</button><button class="button primary" type="submit">Salvar resposta</button></div></form></dialog>
+  <dialog id="rotate-dialog"><div class="dialog-heading"><h2>Substituir chave do site?</h2><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><p>O código incorporado atualmente deixará de abrir novas conversas. Você precisará atualizar o código nos sites desta empresa.</p><p class="field-help">Conversas já abertas continuam com seus próprios tokens.</p><div class="dialog-footer"><button class="close-dialog button secondary" type="button">Cancelar</button><button id="confirm-rotate" class="button primary" type="button">Substituir chave</button></div></dialog>
+</body>
+</html>

@@ -60,11 +60,15 @@ Se o site usa CSP, permita o domínio da API em script-src e connect-src conform
 2. POST /v1/atendimento/site/{empresa_id}/conversas/{conversa_id}/mensagens com Authorization: Bearer TOKEN_CONVERSA e `{"texto":"Minha dúvida","id_cliente":"identificador-unico"}`.
 3. GET da mesma rota para consultar histórico e estado bot/humano/interrompida.
 
-O navegador envia Origin automaticamente. Em testes por cliente HTTP/backend, informe a origem cadastrada. Reutilize id_cliente ao repetir uma tentativa com o mesmo texto: a API grava uma entrada. Reutilizar o ID com outro texto é recusado.
+O navegador envia Origin em POST e consultas entre origens. No GET de histórico de mesma origem, a API usa a origem do Referer quando Origin não é enviado; o token privado continua obrigatório. A página de teste envia apenas a origem como referência. Em testes por cliente HTTP/backend, informe a origem cadastrada. Reutilize id_cliente ao repetir uma tentativa com o mesmo texto: a API grava uma entrada. Reutilizar o ID com outro texto é recusado.
 
 O POST grava na fila e o worker responde depois. O widget consulta a cada dois segundos enquanto aberto; o tempo depende da fila e do provedor. Há até 50 entradas por conversa de site, além do teto diário de novas conversas. Chave pública e origem identificam a configuração; os limites também são aplicados no banco.
 
 ## Atendimento humano
+
+Abra [o painel do operador](https://atendeai-co.squareweb.app/painel) e informe sua `ADMIN_API_KEY`. Selecione a empresa, abra **Atendimento** e clique no chamado. O histórico aparece ao lado da fila. **Assumir atendimento** pausa o bot; enviar uma resposta também mantém o bot pausado. A resposta é registrada na mesma conversa do cliente. Depois de concluir o pedido, use **Concluir e retomar automático**.
+
+A chave administrativa fica apenas em memória e precisa ser informada novamente após recarregar ou sair. O painel não deve ser distribuído com essa chave aos clientes: ela concede acesso a todas as empresas. A versão atual tem um operador administrativo; não há contas individuais ou permissões por funcionário. Base e configuração podem ser gerenciadas pelo painel sem executar rotas manualmente.
 
 GET /v1/atendimento/empresas/{id}/chamados lista a fila. O histórico completo está em /conversas/{conversa_id}. O sistema grava o chamado e pausa o bot antes de registrar a frase de encaminhamento.
 
@@ -76,7 +80,7 @@ O operador responde por `POST /v1/atendimento/empresas/{id}/conversas/{conversa_
 
 A resposta aparece na mesma sessão de site ou entra na fila do WhatsApp correspondente. A IA continua pausada. Após concluir, envie /pausa com `{"pausado":false}` para resolver os chamados abertos e retomar o bot. Com true, o operador assume e cancela respostas automáticas pendentes.
 
-Não há painel visual de operadores ou notificação externa por email nesta versão; a equipe deve acompanhar a fila pela API. Pedido de pessoa, mídia, ausência de resposta, falha da IA, base alterada durante a resposta e limite de automação geram chamados. A API não altera pedidos, cobra pagamentos ou executa ações em sistemas externos.
+O painel acompanha a fila automaticamente enquanto a aba está aberta e visível. Não há notificação externa por email nesta versão. Pedido de pessoa, mídia, ausência de resposta, falha da IA, base alterada durante a resposta e limite de automação geram chamados. A API não altera pedidos, cobra pagamentos ou executa ações em sistemas externos.
 
 ## WhatsApp de cada empresa
 

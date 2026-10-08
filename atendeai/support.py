@@ -35,9 +35,12 @@ def support_message_data(row, private=False):
     return result
 
 
-def support_conversation_data(row):
-    return {"id": row.id, "empresa_id": row.tenant_id, "canal": row.channel, "estado": row.state,
-            "motivo_pausa": row.pause_reason, "criada_em": as_utc(row.created_at).isoformat()}
+def support_conversation_data(row, private=False):
+    result = {"id": row.id, "empresa_id": row.tenant_id, "canal": row.channel, "estado": row.state,
+              "motivo_pausa": row.pause_reason, "criada_em": as_utc(row.created_at).isoformat()}
+    if private:
+        result["contato"] = row.recipient if row.channel == "whatsapp" else None
+    return result
 
 
 class SupportService:

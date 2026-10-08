@@ -1,8 +1,8 @@
-# Verificação da versão 0.3.0
+# Verificação da versão 0.4.0
 
 Data: 8 de outubro de 2026 (UTC).
 
-- 79 testes automatizados passaram no GitHub Actions: 18 da pesquisa/API, 12 da configuração SSL, 27 do agente comercial e 22 do atendimento.
+- 83 testes automatizados passaram localmente: 18 da pesquisa/API, 12 da configuração SSL, 27 do agente comercial, 23 do atendimento e 3 do painel/acesso administrativo. A versão anterior, 0.3, teve 79 testes aprovados também no GitHub Actions.
 - PEM separado e combinado foram validados com certificados fictícios gerados durante os testes. Chaves incompatíveis e valores Base64 inválidos foram recusados antes da conexão.
 - A conversão para variáveis de ambiente, as permissões privadas, a limpeza após falha e a passagem dos parâmetros SSL ao driver foram verificadas.
 - Uma busca real de oficinas, restaurantes, beleza e lojas na área de Campinas retornou 100 cadastros do OpenStreetMap.
@@ -25,3 +25,15 @@ A API publicada em `https://atendeai-co.squareweb.app` iniciou com os certificad
 O fluxo comercial foi testado localmente com SQLite e HTTP simulado. O esquema PostgreSQL compilou; os testes de concorrência em uma instância real de PostgreSQL e a validação do envio/recebimento com número e credenciais reais da Meta ainda dependem dessa configuração. As chamadas de IA foram simuladas; nenhum consumo pago de IA foi realizado. Nenhuma mensagem real de WhatsApp foi enviada.
 
 O agente 3 tem 22 testes de isolamento de empresas/visitantes, base de respostas, limite de uso de IA, webhooks de suporte, interrupção, retomada pelo cliente, encaminhamento humano e demonstração sem IA paga. A suíte completa de 79 testes passou no GitHub Actions em 8 de outubro de 2026, junto da verificação de sintaxe do widget e geração do esquema PostgreSQL. Nenhum número real da Meta foi configurado nesta sessão.
+
+## Painel da versão 0.4
+
+O teste em navegador Chromium passou com empresas fictícias e banco SQLite descartável. O cliente abriu o widget, recebeu uma resposta da base, pediu um humano e recebeu na mesma conversa a resposta enviada pelo painel. O bot continuou pausado até o operador concluir; depois voltou a responder pela base.
+
+Foram verificados login inválido/válido, cadastro de empresa, código de integração, alteração de limites, confirmação/cancelamento de substituição de chave, cadastro/edição/desativação de respostas, separação entre empresas e ausência da chave administrativa em armazenamento persistente ou no código do widget. Textos com marcação HTML foram mostrados como texto sem executar JavaScript.
+
+As telas de login, atendimento e configuração foram conferidas em desktop (1440 px) e celular (390 px), sem rolagem horizontal. Capturas dos testes ficam nos artefatos do workflow Testes AtendeAI. A sintaxe dos dois scripts e a geração do esquema PostgreSQL foram verificadas. O painel não altera o esquema do banco.
+
+A consulta de histórico aceita a origem do Referer quando o GET de mesma origem omite Origin. Token privado, vínculo com a empresa e origem cadastrada continuam obrigatórios; origem inválida, token incorreto e referência malformada foram recusados. O telefone do WhatsApp só é exibido nas rotas do operador.
+
+Nenhuma mensagem real de WhatsApp foi enviada e nenhuma chamada paga de IA foi executada. O teste de navegador usa exclusivamente o servidor descartável de tests/browser_server.py; esse módulo não é importado pelo aplicativo publicado. Integração real com a Meta e contas individuais de operadores/clientes continuam pendentes.

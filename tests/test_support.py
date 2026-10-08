@@ -81,6 +81,18 @@ class SupportTests(unittest.TestCase):
     def tickets(self, tenant):
         return self.client.get(f"/v1/atendimento/empresas/{tenant['id']}/chamados", headers=ADMIN).json()["chamados"]
 
+    def test_same_origin_history_accepts_browser_referer_without_weakening_token_or_origin(self):
+        tenant = self.tenant()
+        chat = self.chat(tenant)
+        headers = {"Authorization": "Bearer " + chat["token_conversa"], "Referer": ORIGIN + "/teste-atendimento?empresa=public"}
+        response = self.client.get(self.path(tenant, chat), headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("contato", response.json()["conversa"])
+        self.assertEqual(self.client.get(self.path(tenant, chat), headers={**headers, "Origin": "https://other.example.invalid"}).status_code, 403)
+        self.assertEqual(self.client.get(self.path(tenant, chat), headers={**headers, "Authorization": "Bearer incorrect"}).status_code, 401)
+        self.assertEqual(self.client.get(self.path(tenant, chat), headers={"Authorization": headers["Authorization"]}).status_code, 403)
+        self.assertEqual(self.client.get(self.path(tenant, chat), headers={**headers, "Referer": "https://[invalid"}).status_code, 403)
+
     def configure_whatsapp(self, tenant):
         account = {"enabled": True, "token": "fake-support-token", "phone_number_id": "987654321",
                    "app_secret": "fake-support-secret", "verify_token": "fake-support-verify", "api_version": "v24.0"}

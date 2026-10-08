@@ -93,6 +93,20 @@ def bearer(header):
     return header[7:] if header and header.startswith("Bearer ") else ""
 
 
+def history_origin(origin, referer):
+    # GET de mesma origem pode omitir Origin. Usa só a origem do Referer;
+    # o token privado e o vínculo com a empresa continuam obrigatórios.
+    if origin:
+        return origin
+    try:
+        parsed = urlsplit(referer or "")
+    except ValueError:
+        return None
+    if parsed.scheme in {"http", "https"} and parsed.netloc and not parsed.username and not parsed.password:
+        return f"{parsed.scheme}://{parsed.netloc.lower()}"
+    return None
+
+
 def support_routers(service, admin):
     protected = APIRouter(prefix="/v1/atendimento", dependencies=[Depends(admin)], tags=["Agente 3 — administração"])
     public = APIRouter(tags=["Agente 3 — site e webhook"])
@@ -163,7 +177,7 @@ def support_routers(service, admin):
             service.tenant(session, tenant_id)
             rows = session.scalars(select(SupportConversation).where(SupportConversation.tenant_id == tenant_id)
                 .order_by(SupportConversation.created_at.desc()).offset((pagina - 1) * limite).limit(limite)).all()
-            return {"conversas": [support_conversation_data(row) for row in rows], "pagina": pagina}
+            return {"conversas": [support_conversation_data(row, private=True) for row in rows], "pagina": pagina}
 
     @protected.get("/empresas/{tenant_id}/conversas/{conversation_id}")
     def history(tenant_id: str, conversation_id: str, limite: int = Query(100, ge=1, le=1000), pagina: int = Query(1, ge=1)):
@@ -171,7 +185,7 @@ def support_routers(service, admin):
             conversation = service.conversation(session, tenant_id, conversation_id)
             rows = session.scalars(select(SupportMessage).where(SupportMessage.conversation_id == conversation.id)
                 .order_by(SupportMessage.created_at.desc(), SupportMessage.id).offset((pagina - 1) * limite).limit(limite)).all()
-            return {"conversa": support_conversation_data(conversation), "pagina": pagina,
+            return {"conversa": support_conversation_data(conversation, private=True), "pagina": pagina,
                     "mensagens": [support_message_data(row, private=True) for row in reversed(rows)]}
 
     @protected.post("/empresas/{tenant_id}/conversas/{conversation_id}/responder")
@@ -211,7 +225,7 @@ def support_routers(service, admin):
     @public.get("/teste-atendimento", include_in_schema=False)
     def test_chat():
         return FileResponse(Path(__file__).parent / "static" / "test-chat.html", media_type="text/html",
-                            headers={"Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
+                            headers={"Referrer-Policy": "origin", "Cache-Control": "no-store"})
 
     @public.post("/v1/atendimento/site/{tenant_id}/conversas")
     def open_conversation(tenant_id: str, response: Response, x_site_key: str | None = Header(None), origin: str | None = Header(None)):
@@ -226,9 +240,10 @@ def support_routers(service, admin):
 
     @public.get("/v1/atendimento/site/{tenant_id}/conversas/{conversation_id}/mensagens")
     def site_history(tenant_id: str, conversation_id: str, response: Response,
-                     authorization: str | None = Header(None), origin: str | None = Header(None)):
+                     authorization: str | None = Header(None), origin: str | None = Header(None),
+                     referer: str | None = Header(None)):
         with service.sessions() as session:
-            conversation = service.visitor_access(session, tenant_id, conversation_id, bearer(authorization), origin)
+            conversation = service.visitor_access(session, tenant_id, conversation_id, bearer(authorization), history_origin(origin, referer))
             rows = session.scalars(select(SupportMessage).where(SupportMessage.conversation_id == conversation.id)
                 .order_by(SupportMessage.created_at, SupportMessage.id).limit(200)).all()
             response.headers["Cache-Control"] = "no-store"

@@ -1,4 +1,4 @@
-# AtendeAI — pesquisa, comercial e atendimento, versão 0.3.0
+# AtendeAI — pesquisa, comercial e atendimento, versão 0.4.0
 
 Plataforma organizada em três módulos:
 
@@ -6,11 +6,28 @@ Plataforma organizada em três módulos:
 | --- | --- | --- |
 | Agente 1 | Encontrar, organizar e analisar possíveis clientes | Implementado |
 | Agente 2 | Apresentar o serviço e acompanhar interessados | Implementado; ativação depende da configuração do WhatsApp oficial |
-| Agente 3 | Atender clientes das empresas pelo site ou WhatsApp | API e chat de site implementados; contas WhatsApp dependem de configuração |
+| Agente 3 | Atender clientes das empresas pelo site ou WhatsApp | API, chat de site e painel do operador implementados; contas WhatsApp dependem de configuração |
 
 Os módulos podem usar o mesmo provedor de IA, com instruções e permissões distintas. Não é necessário contratar três modelos diferentes. Esta versão inclui os três módulos. O atendimento tem uma base de respostas e conversas por empresa; o WhatsApp usa as credenciais da conta de cada cliente.
 
 Abra [a demonstração do atendimento no site](https://atendeai-co.squareweb.app/demonstracao) para testar as respostas da base e o encaminhamento. A demonstração não ativa IA paga nem conecta um número WhatsApp.
+
+## Painel de atendimento
+
+Abra [o painel](https://atendeai-co.squareweb.app/painel) e entre com o valor de `ADMIN_API_KEY` cadastrado nas variáveis de ambiente da Square Cloud. A página não contém uma chave pronta; ela é informada pelo operador e mantida apenas na memória da aba. Sair, recarregar ou fechar a página exige entrar novamente. A chave não é gravada em cookies, localStorage, sessionStorage ou links.
+
+No painel, selecione a empresa e use:
+
+- **Atendimento:** consultar chamados abertos/resolvidos e conversas, ler o histórico, assumir o atendimento, responder ao cliente e concluir com retomada automática. A fila atualiza a cada 15 segundos, e o histórico aberto a cada 5 segundos enquanto a aba está visível.
+- **Base de respostas:** cadastrar, editar, ativar e desativar informações da empresa.
+- **Configuração:** ajustar boas-vindas, sites permitidos, limites diários e uso de IA; consultar o estado da integração WhatsApp e gerar o código do chat.
+- **Nova empresa:** criar um cadastro de atendimento separado, inicialmente sem IA paga. Guarde o código do chat exibido após o cadastro: a chave pública original não é recuperável. Substituí-la exige confirmação no painel e atualização dos sites incorporados.
+
+A chave é administrativa e concede acesso a todas as empresas. Este painel é para o dono/operador da plataforma; não oferece logins individuais de funcionários ou acesso restrito de cada cliente. Contas e permissões individuais serão necessários antes de distribuir o painel às empresas contratantes. Não coloque a chave administrativa no widget de visitantes.
+
+Responder mantém o bot pausado. **Concluir e retomar automático** resolve os chamados abertos daquela conversa e permite novas respostas automáticas. Para WhatsApp, o painel mostra fila/aceitação/entrega separadamente; o envio manual depende da conta habilitada e da janela de atendimento. Uma ação sem confirmação de rede não é repetida automaticamente.
+
+Os certificados, a conexão PostgreSQL e as credenciais dos provedores continuam exclusivamente nas variáveis de ambiente. Nenhuma tabela nova é necessária para o painel. Consulte [AGENTE-3.md](AGENTE-3.md) para o cadastro e a integração.
 
 ## Pesquisa e cobertura
 
