@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import os
+import re
 
 from dotenv import load_dotenv
 from sqlalchemy.engine import make_url
@@ -21,6 +22,17 @@ class Settings:
     database_ssl_cert_b64: str = field(default="", repr=False)
     database_ssl_key_b64: str = field(default="", repr=False)
     database_ssl_mode: str = ""
+    whatsapp_enabled: bool = False
+    whatsapp_token: str = field(default="", repr=False)
+    whatsapp_phone_number_id: str = ""
+    whatsapp_app_secret: str = field(default="", repr=False)
+    whatsapp_verify_token: str = field(default="", repr=False)
+    whatsapp_api_version: str = "v24.0"
+    whatsapp_template_name: str = "atendeai_apresentacao"
+    whatsapp_template_language: str = "pt_BR"
+    commercial_auto_reply: bool = True
+    commercial_daily_limit: int = 100
+    commercial_max_auto_replies: int = 6
 
     @classmethod
     def from_env(cls):
@@ -40,7 +52,30 @@ class Settings:
             database_ssl_cert_b64=os.getenv("DATABASE_SSL_CERT_B64", ""),
             database_ssl_key_b64=os.getenv("DATABASE_SSL_KEY_B64", ""),
             database_ssl_mode=os.getenv("DATABASE_SSL_MODE", ""),
+            whatsapp_enabled=env_bool("WHATSAPP_ENABLED", False),
+            whatsapp_token=os.getenv("WHATSAPP_TOKEN", ""),
+            whatsapp_phone_number_id=os.getenv("WHATSAPP_PHONE_NUMBER_ID", ""),
+            whatsapp_app_secret=os.getenv("WHATSAPP_APP_SECRET", ""),
+            whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", ""),
+            whatsapp_api_version=os.getenv("WHATSAPP_API_VERSION", "v24.0"),
+            whatsapp_template_name=os.getenv("WHATSAPP_TEMPLATE_NAME", "atendeai_apresentacao"),
+            whatsapp_template_language=os.getenv("WHATSAPP_TEMPLATE_LANGUAGE", "pt_BR"),
+            commercial_auto_reply=env_bool("COMMERCIAL_AUTO_REPLY", True),
+            commercial_daily_limit=int(os.getenv("COMMERCIAL_DAILY_LIMIT", "100")),
+            commercial_max_auto_replies=int(os.getenv("COMMERCIAL_MAX_AUTO_REPLIES", "6")),
         )
+
+    def whatsapp_missing(self):
+        return [name for name, value in {
+            "WHATSAPP_TOKEN": self.whatsapp_token,
+            "WHATSAPP_PHONE_NUMBER_ID": self.whatsapp_phone_number_id,
+            "WHATSAPP_APP_SECRET": self.whatsapp_app_secret,
+            "WHATSAPP_VERIFY_TOKEN": self.whatsapp_verify_token,
+        }.items() if not value.strip()]
+
+    @property
+    def whatsapp_ready(self):
+        return self.whatsapp_enabled and not self.whatsapp_missing()
 
     def validated(self):
         if self.environment not in {"development", "production", "test"}:
@@ -53,6 +88,16 @@ class Settings:
             raise ValueError("SEARCH_CACHE_HOURS deve estar entre 1 e 720.")
         if not 0 <= self.provider_interval_seconds <= 86400:
             raise ValueError("PROVIDER_INTERVAL_SECONDS inválido.")
+        if not re.fullmatch(r"v\d{1,2}\.\d", self.whatsapp_api_version):
+            raise ValueError("WHATSAPP_API_VERSION deve ter o formato v24.0.")
+        if self.whatsapp_phone_number_id and not re.fullmatch(r"\d{5,25}", self.whatsapp_phone_number_id):
+            raise ValueError("WHATSAPP_PHONE_NUMBER_ID é o ID numérico da Meta, não o telefone.")
+        if not re.fullmatch(r"[a-z0-9_]{1,100}", self.whatsapp_template_name):
+            raise ValueError("WHATSAPP_TEMPLATE_NAME deve conter letras minúsculas, números ou sublinhado.")
+        if not re.fullmatch(r"[a-z]{2}(?:_[A-Z]{2})?", self.whatsapp_template_language):
+            raise ValueError("WHATSAPP_TEMPLATE_LANGUAGE inválido.")
+        if not 1 <= self.commercial_daily_limit <= 1000 or not 1 <= self.commercial_max_auto_replies <= 30:
+            raise ValueError("Limite comercial deve ser 1 a 1000; respostas automáticas, 1 a 30.")
         url = self.database_url
         if url.startswith("postgres://"):
             url = "postgresql+psycopg://" + url[len("postgres://"):]
@@ -83,3 +128,10 @@ class Settings:
             if self.search_provider == "demo":
                 raise ValueError("Produção exige SEARCH_PROVIDER=overpass.")
         return url
+
+
+def env_bool(name, default):
+    value = os.getenv(name, str(default)).strip().lower()
+    if value not in {"true", "false", "1", "0"}:
+        raise ValueError(f"{name} deve ser true ou false.")
+    return value in {"true", "1"}

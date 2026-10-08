@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import uuid
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, create_engine, event
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -88,6 +88,76 @@ class ProviderLease(Base):
     __tablename__ = "provider_leases"
     name: Mapped[str] = mapped_column(String(50), primary_key=True)
     next_allowed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class CommercialConversation(Base):
+    __tablename__ = "commercial_conversations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    recipient: Mapped[str] = mapped_column(String(20), unique=True)
+    lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id"), index=True)
+    last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_inbound_id: Mapped[str | None] = mapped_column(String(36))
+    opted_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    paused: Mapped[bool] = mapped_column(Boolean, default=False)
+    pause_reason: Mapped[str | None] = mapped_column(String(100))
+    auto_replies: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CommercialMessage(Base):
+    __tablename__ = "commercial_messages"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id"), index=True)
+    conversation_id: Mapped[str | None] = mapped_column(ForeignKey("commercial_conversations.id"), index=True)
+    recipient: Mapped[str | None] = mapped_column(String(20))
+    sender_id: Mapped[str | None] = mapped_column(String(25))
+    direction: Mapped[str] = mapped_column(String(10))
+    kind: Mapped[str] = mapped_column(String(20))
+    purpose: Mapped[str] = mapped_column(String(30))
+    text: Mapped[str] = mapped_column(Text)
+    payload: Mapped[dict | None] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    delivery_status: Mapped[str | None] = mapped_column(String(20))
+    provider_message_id: Mapped[str | None] = mapped_column(String(250), unique=True)
+    reply_to_id: Mapped[str | None] = mapped_column(ForeignKey("commercial_messages.id"), unique=True)
+    opening_key: Mapped[str | None] = mapped_column(String(64), unique=True)
+    engine: Mapped[str | None] = mapped_column(String(60))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    processing_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CommercialHandoff(Base):
+    __tablename__ = "commercial_handoffs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("commercial_conversations.id"), index=True)
+    reason: Mapped[str] = mapped_column(String(100))
+    summary: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="aberto", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WhatsAppStatusEvent(Base):
+    __tablename__ = "whatsapp_status_events"
+    __table_args__ = (UniqueConstraint("provider_message_id", "status", "occurred_at", name="uq_whatsapp_status"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    provider_message_id: Mapped[str] = mapped_column(String(250), index=True)
+    recipient: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    error_code: Mapped[str | None] = mapped_column(String(40))
+
+
+class CommercialQuota(Base):
+    __tablename__ = "commercial_quotas"
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    opening_attempts: Mapped[int] = mapped_column(Integer, default=0)
 
 
 def build_database(url: str, *, connect_args=None):

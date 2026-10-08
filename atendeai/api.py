@@ -1,15 +1,20 @@
 from contextlib import asynccontextmanager
+import asyncio
 from datetime import datetime, timedelta
+import logging
 import secrets
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.security import APIKeyHeader
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from .catalog import CITIES, SEGMENTS, resolve_city
+from .commercial import CommercialError, CommercialService
+from .commercial_routes import commercial_routers
 from .config import Settings
 from .database_ssl import DatabaseSSL
 from .models import Base, ConsentEvent, Lead, as_utc, build_database, utcnow
@@ -71,7 +76,7 @@ class ConsentRequest(StrictBody):
         return value
 
 
-def create_app(settings=None, source=None, ai_transport=None):
+def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport=None):
     settings = settings or Settings.from_env()
     database_url = settings.validated()
     ssl_files = DatabaseSSL(settings, database_url)
@@ -81,24 +86,53 @@ def create_app(settings=None, source=None, ai_transport=None):
         ssl_files.close()
         raise
     source = source or (DemoSource() if settings.search_provider == "demo" else OverpassSource(settings.overpass_url))
+    commercial = CommercialService(sessions, settings, whatsapp_transport, ai_transport)
+
+    async def commercial_worker(stop):
+        while not stop.is_set():
+            try:
+                await asyncio.to_thread(commercial.process_cycle)
+            except Exception as error:
+                # Não registra payload, token ou dados privados na mensagem de erro.
+                logging.getLogger("atendeai.comercial").error("Falha no processamento comercial: %s", type(error).__name__)
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=3)
+            except TimeoutError:
+                pass
 
     @asynccontextmanager
     async def lifespan(app):
+        task, stop = None, asyncio.Event()
         try:
             Base.metadata.create_all(engine)
+            if settings.whatsapp_ready and settings.environment != "test":
+                task = asyncio.create_task(commercial_worker(stop))
             yield
         finally:
-            engine.dispose()
-            ssl_files.close()
+            stop.set()
+            try:
+                if task:
+                    await task
+            finally:
+                engine.dispose()
+                ssl_files.close()
 
-    app = FastAPI(title="AtendeAI — Agente 1", version="0.1.0", lifespan=lifespan,
-                  description="Pesquisa em São Paulo capital e interior. Esta versão não envia mensagens. Use Authorize com ADMIN_API_KEY.")
+    app = FastAPI(title="AtendeAI — Pesquisa e Comercial", version="0.2.0", lifespan=lifespan,
+                  description="Pesquisa em São Paulo capital e interior e agente comercial via WhatsApp oficial. Configure o número e as credenciais antes de habilitar o envio. Use Authorize com ADMIN_API_KEY.")
     app.state.settings, app.state.engine, app.state.sessions = settings, engine, sessions
+    app.state.commercial = commercial
     key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
     def admin(key: str | None = Depends(key_header)):
-        if not key or not secrets.compare_digest(key, settings.admin_api_key):
+        if not key or not secrets.compare_digest(key.encode(), settings.admin_api_key.encode()):
             raise HTTPException(401, "Chave de acesso inválida.")
+
+    @app.exception_handler(CommercialError)
+    async def commercial_error(request, error):
+        return JSONResponse(status_code=error.status_code, content={"detail": str(error)})
+
+    for router in commercial_routers(commercial, admin):
+        app.include_router(router)
 
     def session_dependency():
         with sessions() as session:
@@ -115,9 +149,10 @@ def create_app(settings=None, source=None, ai_transport=None):
 
     @app.get("/", tags=["Informações"])
     def index():
-        return {"projeto": "AtendeAI", "versao": "0.1.0", "documentacao": "/docs",
-                "agentes": {"1_pesquisa": "implementado", "2_comercial": "proxima_etapa", "3_atendimento": "etapa_posterior"},
-                "fonte_configurada": source.name, "envio_whatsapp_ativo": False}
+        return {"projeto": "AtendeAI", "versao": "0.2.0", "documentacao": "/docs",
+                "agentes": {"1_pesquisa": "implementado", "2_comercial": "implementado" if settings.whatsapp_ready else "implementado_configuracao_pendente",
+                            "3_atendimento": "etapa_posterior"},
+                "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}
 
     @app.get("/health", tags=["Informações"])
     def health():
@@ -209,12 +244,12 @@ def create_app(settings=None, source=None, ai_transport=None):
         session.commit()
         return serialize_lead(lead)
 
-    @app.get("/v1/comercial/fila", dependencies=[Depends(admin)], tags=["Preparação do agente 2"])
+    @app.get("/v1/comercial/fila", dependencies=[Depends(admin)], tags=["Agente 2"])
     def commercial_queue(limite: int = Query(100, ge=1, le=1000), session=Depends(session_dependency)):
         query = select(Lead).where(Lead.is_demo.is_(False), Lead.review_status == "aprovada",
                                    Lead.consent_status == "concedido", Lead.whatsapp_recipient.is_not(None))
         rows = session.scalars(query.order_by(Lead.priority.desc(), Lead.id).limit(limite)).all()
         return {"quantidade": len(rows), "empresas": [serialize_lead(row) for row in rows],
-                "envio_ativo": False, "etapa": "Fila de preparação; o agente comercial será implementado na próxima etapa."}
+                "envio_ativo": settings.whatsapp_ready, "etapa": "Empresas autorizadas para preparar e revisar a abordagem comercial."}
 
     return app

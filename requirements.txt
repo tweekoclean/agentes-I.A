@@ -4,3 +4,4 @@ SQLAlchemy==2.0.54
 psycopg[binary]==3.3.6
 httpx[socks]==0.28.1
 python-dotenv==1.2.4
+tzdata==2026.5

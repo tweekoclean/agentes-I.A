@@ -1,14 +1,14 @@
-# AtendeAI — pesquisa de empresas, versão 0.1.0
+# AtendeAI — pesquisa e agente comercial, versão 0.2.0
 
-Base da plataforma que terá três módulos:
+Plataforma organizada em três módulos:
 
 | Módulo | Função | Estado desta versão |
 | --- | --- | --- |
 | Agente 1 | Encontrar, organizar e analisar possíveis clientes | Implementado |
-| Agente 2 | Apresentar o serviço e acompanhar interessados | Fila preparada; envio e conversa serão implementados depois |
+| Agente 2 | Apresentar o serviço e acompanhar interessados | Implementado; ativação depende da configuração do WhatsApp oficial |
 | Agente 3 | Atender clientes das empresas pelo site ou WhatsApp | Etapa posterior |
 
-Os módulos podem usar o mesmo provedor de IA, com instruções e permissões distintas. Não é necessário contratar três modelos diferentes. Esta versão implementa a primeira etapa pedida; não é uma plataforma de atendimento completa.
+Os módulos podem usar o mesmo provedor de IA, com instruções e permissões distintas. Não é necessário contratar três modelos diferentes. Esta versão implementa pesquisa e conversa comercial; o atendimento das empresas contratantes será a etapa 3.
 
 ## Pesquisa e cobertura
 
@@ -120,7 +120,7 @@ Mantenha `APP_ENV=development` e `SEARCH_PROVIDER=demo` enquanto testa a conexã
 
 No primeiro início, a aplicação cria as tabelas que ainda não existem. Ela não remove registros existentes. Produção rejeita SQLite, modo demo e a chave padrão. Alterações futuras do esquema deverão usar migrações; `create_all` não modifica tabelas já criadas.
 
-Após publicar, abra `/health` e depois `/docs`. Toda rota com dados ou ações exige `X-API-Key`. A documentação permite informar essa chave por **Authorize**. Esta chave é administrativa e deve ficar no servidor ou nas ferramentas do operador; não a coloque em um chat JavaScript público de clientes.
+Após publicar, abra `/health` e depois `/docs`. As rotas administrativas com dados ou ações exigem `X-API-Key`. A documentação permite informar essa chave por **Authorize**. Esta chave é administrativa e deve ficar no servidor ou nas ferramentas do operador; não a coloque em um chat JavaScript público de clientes. O webhook da Meta tem autenticação própria: token de verificação no cadastro e assinatura HMAC nos eventos.
 
 Comandos auxiliares:
 
@@ -132,7 +132,7 @@ python manage.py gerar-sql
 
 `schema-postgresql.sql` também permite conferir as tabelas. Execute esse SQL apenas uma vez em um banco vazio, se optar pela criação manual. A criação automática da aplicação dispensa executar o arquivo manualmente.
 
-Vercel também suporta FastAPI. Este pacote está preparado diretamente para Square Cloud; a implantação na Vercel exigirá configurar o projeto e manter PostgreSQL externo. Rotinas futuras de pesquisa ou envio em segundo plano deverão usar execução durável, em vez de depender de uma tarefa que pode morrer depois da requisição.
+Vercel também suporta FastAPI. Este pacote está preparado diretamente para Square Cloud, com um processo persistente que acompanha a fila comercial gravada no banco. A implantação na Vercel exigirá configurar o projeto, manter PostgreSQL externo e executar o processamento da fila em um worker durável.
 
 ## Análise opcional por IA
 
@@ -140,7 +140,7 @@ Configure `OPENAI_API_KEY` e, se desejar, `OPENAI_MODEL`. O modelo inicial é `g
 
 Com a chave, a API chama a Responses API da OpenAI, exige uma saída JSON estruturada e valida a resposta localmente. Envia o nome, cidade, segmento, presença de canais públicos e horários publicados; não envia o número de telefone nem o endereço de email nessa análise. A análise aponta uma hipótese de benefício e perguntas para validar a necessidade. Ela não altera o contato, o consentimento ou a revisão.
 
-Sem chave, o endpoint devolve uma análise simples baseada em regras e marca `modo=regras_sem_ia`. A pesquisa real não depende do modelo. Nenhuma chamada de IA paga é realizada apenas por iniciar a aplicação ou pesquisar uma cidade; cada análise é acionada separadamente.
+Sem chave, o endpoint devolve uma análise simples baseada em regras e marca `modo=regras_sem_ia`. A pesquisa real não depende do modelo. Nenhuma chamada de IA paga é realizada apenas por pesquisar uma cidade. As análises são acionadas separadamente; se o WhatsApp estiver habilitado e houver mensagens pendentes de clientes autorizados, o agente comercial também poderá chamar o modelo automaticamente.
 
 ## Rotas principais
 
@@ -155,19 +155,32 @@ Sem chave, o endpoint devolve uma análise simples baseada em regras e marca `mo
 | `POST /v1/empresas/{id}/analise` | Analisar os dados coletados |
 | `POST /v1/empresas/{id}/revisao` | Aprovar, manter pendente ou descartar uma oportunidade |
 | `POST /v1/empresas/{id}/consentimento` | Registrar autorização ou revogação de contato comercial |
-| `GET /v1/comercial/fila` | Listar contatos aprovados e autorizados para a próxima etapa |
+| `GET /v1/comercial/fila` | Listar contatos aprovados e autorizados |
+| `GET /v1/comercial/status` | Conferir configuração, fila, limite diário e template |
+| `POST /v1/comercial/rascunhos` | Preparar a apresentação sem enviar |
+| `POST /v1/comercial/mensagens/{id}/revisao` | Aprovar ou descartar a mensagem |
+| `POST /v1/comercial/mensagens/{id}/enfileirar` | Autorizar o processamento da mensagem revisada |
+| `GET /v1/comercial/mensagens` | Acompanhar mensagens e resultados de envio |
+| `GET /v1/comercial/conversas/{id}` | Consultar a conversa e seu histórico |
+| `GET /v1/comercial/encaminhamentos` | Consultar os chamados para o responsável |
+| `POST /v1/comercial/conversas/{id}/pausa` | Pausar ou retomar a IA após atendimento humano |
+| `GET/POST /webhooks/whatsapp` | Verificação, recebimento de mensagens e status da Meta |
 
 A deduplicação usa fonte + identificador do cadastro. Isso evita duplicar buscas repetidas e preserva filiais com o mesmo telefone. Objetos diferentes da fonte que representam o mesmo estabelecimento ainda podem exigir revisão manual.
 
-## Preparação do agente comercial
+## Agente comercial pelo WhatsApp
 
 Aprovar uma oportunidade não significa conceder autorização para contato. Uma empresa só aparece na fila quando é um registro real, está aprovada e possui autorização registrada para receber ofertas no número indicado.
 
 O registro administrativo da autorização deve conter uma evidência verificável e a data real. O operador é responsável pela autenticidade da evidência: o software não transforma um texto digitado em consentimento válido. Uma página com telefone público não basta. A autorização pode ser obtida por formulário ou outro fluxo apropriado antes do contato comercial pelo WhatsApp.
 
-Pedidos de interrupção removem o contato da fila. Um evento antigo não reativa uma autorização revogada mais recentemente. A próxima etapa precisará verificar o estado imediatamente antes de cada envio, registrar o resultado de cada mensagem e receber revogações também pelas respostas do WhatsApp.
+Pedidos de interrupção recebidos pelo webhook revogam a autorização do destinatário, pausam a conversa e cancelam mensagens pendentes. Um evento antigo não reativa uma autorização revogada mais recentemente. O agente verifica revisão, consentimento, destinatário e pausa novamente antes de cada envio.
 
-Não há envio de mensagem nesta versão e nenhum número foi conectado. Para a etapa 2, serão necessários a configuração do WhatsApp Business Platform, um remetente adequado e modelos aprovados quando exigidos. Os limites, custos e regras do WhatsApp continuarão valendo.
+O envio fica desligado por padrão. Para ativar, configure o WhatsApp Business Platform, o número remetente, as credenciais e o template aprovado. Consulte [AGENTE-2.md](AGENTE-2.md) para configurar o webhook e testar o fluxo. Aprovação local da mensagem e aprovação do template pela Meta são etapas distintas.
+
+O primeiro contato usa template, com revisão manual da mensagem. As respostas dentro da janela de 24 horas podem usar a IA ou regras quando não houver chave. Interesse em demonstração, preço, contratação, pedido de pessoa, mídia ou dúvida não respondida geram um chamado com histórico e pausam a IA. A resposta de encaminhamento só é enviada quando o contato está autorizado e a janela permite.
+
+O banco registra fila, entradas, respostas, encaminhamentos, pedidos de interrupção e status de entrega. Uma aceitação da API não é confirmação de entrega. Falhas incertas não são reenviadas automaticamente. Há uma abordagem inicial por destinatário e limite diário configurável, inicialmente 100 tentativas/reservas no fuso de São Paulo. Os limites, custos e regras do WhatsApp continuam valendo.
 
 ## Depois: atendimento por site e WhatsApp
 
@@ -181,9 +194,9 @@ Se precisar de uma pessoa, o sistema deverá primeiro registrar e encaminhar o c
 python -m unittest discover -s tests -v
 ```
 
-Os testes usam SQLite em memória, respostas simuladas do provedor e chamadas de IA simuladas. Cobrem autenticação, escopo geográfico, deduplicação, preservação de filiais, cache, consentimento, revogação, eventos antigos, isolamento da decisão de IA, indisponibilidade da fonte e compilação do esquema PostgreSQL. Também verificam Base64, PEM combinado e separado, chave incompatível, permissões dos arquivos, passagem dos parâmetros ao driver e limpeza após falha de inicialização. Os testes que geram certificados efêmeros exigem `openssl` no computador; os demais testes não dependem dele. Eles não enviam mensagens nem cobram uso de IA.
+Os testes usam SQLite em memória e HTTP simulado para pesquisa, Meta e IA. Cobrem pesquisa, autenticação, consentimento, SSL, revisão de mensagens, duplicatas, cancelamento, falhas de envio, janela de resposta, limites, assinatura dos webhooks, interrupção de contato e chamados com pausa da IA. Também compilam o esquema PostgreSQL. Os testes que geram certificados efêmeros exigem `openssl` no computador; os demais testes não dependem dele. Eles não enviam mensagens reais nem cobram uso de IA.
 
-Uma conexão real com seu PostgreSQL deverá ser verificada depois de configurar a URI. O teste do esquema não equivale a testar sua instância de PostgreSQL.
+A API publicada na Square Cloud já conectou ao PostgreSQL do projeto e persistiu uma busca de 20 restaurantes de Campinas. O fluxo de WhatsApp foi verificado com HTTP simulado; a validação com um número real depende da configuração da conta Meta. Veja [VERIFICACAO.md](VERIFICACAO.md).
 
 ## Fontes e licenças
 
