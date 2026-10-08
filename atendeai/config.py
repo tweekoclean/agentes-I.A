@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 import os
 import re
 
@@ -33,6 +34,7 @@ class Settings:
     commercial_auto_reply: bool = True
     commercial_daily_limit: int = 100
     commercial_max_auto_replies: int = 6
+    support_whatsapp_accounts: dict = field(default_factory=dict, repr=False)
 
     @classmethod
     def from_env(cls):
@@ -63,6 +65,7 @@ class Settings:
             commercial_auto_reply=env_bool("COMMERCIAL_AUTO_REPLY", True),
             commercial_daily_limit=int(os.getenv("COMMERCIAL_DAILY_LIMIT", "100")),
             commercial_max_auto_replies=int(os.getenv("COMMERCIAL_MAX_AUTO_REPLIES", "6")),
+            support_whatsapp_accounts=parse_support_accounts(os.getenv("SUPPORT_WHATSAPP_ACCOUNTS_JSON", "{}")),
         )
 
     def whatsapp_missing(self):
@@ -98,6 +101,7 @@ class Settings:
             raise ValueError("WHATSAPP_TEMPLATE_LANGUAGE inválido.")
         if not 1 <= self.commercial_daily_limit <= 1000 or not 1 <= self.commercial_max_auto_replies <= 30:
             raise ValueError("Limite comercial deve ser 1 a 1000; respostas automáticas, 1 a 30.")
+        validate_support_accounts(self.support_whatsapp_accounts, self.whatsapp_phone_number_id)
         url = self.database_url
         if url.startswith("postgres://"):
             url = "postgresql+psycopg://" + url[len("postgres://"):]
@@ -135,3 +139,41 @@ def env_bool(name, default):
     if value not in {"true", "false", "1", "0"}:
         raise ValueError(f"{name} deve ser true ou false.")
     return value in {"true", "1"}
+
+
+
+def parse_support_accounts(value):
+    try:
+        result = json.loads(value)
+        validate_support_accounts(result)
+        return result
+    except (ValueError, TypeError):
+        raise ValueError("SUPPORT_WHATSAPP_ACCOUNTS_JSON inválido. Confira IDs e credenciais sem publicá-los.") from None
+
+
+def validate_support_accounts(accounts, commercial_id=""):
+    if not isinstance(accounts, dict):
+        raise ValueError("SUPPORT_WHATSAPP_ACCOUNTS_JSON deve ser um objeto JSON.")
+    used = {commercial_id} if commercial_id else set()
+    for tenant_id, account in accounts.items():
+        if not isinstance(tenant_id, str) or not re.fullmatch(r"[a-f0-9-]{36}", tenant_id) or not isinstance(account, dict):
+            raise ValueError("Cada conta de suporte precisa do ID da empresa e de um objeto de configuração.")
+        if set(account) - {"enabled", "token", "phone_number_id", "app_secret", "verify_token", "api_version"}:
+            raise ValueError("Campo desconhecido em SUPPORT_WHATSAPP_ACCOUNTS_JSON.")
+        if not isinstance(account.get("enabled", False), bool):
+            raise ValueError("enabled da conta WhatsApp precisa ser booleano JSON.")
+        for name in ["token", "phone_number_id", "app_secret", "verify_token", "api_version"]:
+            if name in account and not isinstance(account[name], str):
+                raise ValueError("Credenciais da conta WhatsApp precisam ser textos.")
+        phone_id = account.get("phone_number_id", "")
+        if phone_id and not re.fullmatch(r"\d{5,25}", phone_id):
+            raise ValueError("phone_number_id do suporte precisa ser um ID numérico da Meta.")
+        if not re.fullmatch(r"v\d{1,2}\.\d", account.get("api_version", "v24.0")):
+            raise ValueError("Versão da API WhatsApp de suporte inválida.")
+        if phone_id in used:
+            raise ValueError("Cada número WhatsApp deve pertencer a um único módulo e empresa.")
+        if phone_id:
+            used.add(phone_id)
+        if account.get("enabled", False) and any(not account.get(name, "").strip() for name in
+                ["token", "phone_number_id", "app_secret", "verify_token"]):
+            raise ValueError("Conta WhatsApp de suporte habilitada exige as quatro credenciais.")

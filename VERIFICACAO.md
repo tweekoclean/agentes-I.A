@@ -1,4 +1,4 @@
-# Verificação da versão 0.2.0
+# Verificação da versão 0.3.0
 
 Data: 8 de outubro de 2026 (UTC).
 
@@ -23,3 +23,5 @@ Os 100 registros são cadastros da fonte pública, não empresas que manifestara
 A API publicada em `https://atendeai-co.squareweb.app` iniciou com os certificados configurados nas variáveis de ambiente e conectou ao PostgreSQL do projeto. `/health` retornou `status: ok`, e uma busca real de restaurantes de Campinas persistiu 20 cadastros, depois consultados em `GET /v1/empresas`. Esses registros permanecem sem revisão aprovada e sem consentimento comercial.
 
 O fluxo comercial foi testado localmente com SQLite e HTTP simulado. O esquema PostgreSQL compilou; os testes de concorrência em uma instância real de PostgreSQL e a validação do envio/recebimento com número e credenciais reais da Meta ainda dependem dessa configuração. As chamadas de IA foram simuladas; nenhum consumo pago de IA foi realizado. Nenhuma mensagem real de WhatsApp foi enviada.
+
+O agente 3 acrescenta 21 testes de isolamento de empresas/visitantes, base de respostas, limite de uso de IA, webhooks de suporte, interrupção, retomada pelo cliente e encaminhamento humano. Eles passaram localmente antes da recuperação do código para o GitHub. A suíte completa de 78 verificações deve passar no workflow Testes AtendeAI antes da publicação desta etapa. O widget também passa por verificação de sintaxe JavaScript. Nenhum número real da Meta está configurado nesta sessão.

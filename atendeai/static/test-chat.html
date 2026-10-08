@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste de atendimento · AtendeAI</title><style>
+body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#f5f8fa;color:#17324d;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box}
+main{max-width:520px;background:white;border:1px solid #e2e8ee;border-radius:22px;padding:34px;box-shadow:0 12px 45px #17324d0a}.brand{font-size:14px;font-weight:700;color:#075e54;letter-spacing:.05em}h1{font-size:30px;line-height:1.2;margin:18px 0}p{line-height:1.65;color:#526777}.note{background:#eaf6f1;border-radius:12px;padding:14px 18px;color:#075e54;font-size:14px}
+</style></head><body><main><div class="brand">ATENDEAI</div><h1>Seu atendimento começa aqui.</h1><p>Abra o botão <strong>Atendimento</strong> no canto da página para conversar com o assistente virtual.</p><p>Faça uma pergunta cadastrada na base da empresa. Se precisar de uma pessoa, escreva “quero falar com um atendente”.</p><div class="note" id="info">Carregando o chat…</div></main>
+<script>
+const params = new URLSearchParams(location.search), tenant = params.get('empresa'), key = params.get('chave'), info = document.getElementById('info');
+if (tenant && key) {
+  const script = document.createElement('script'); script.src = '/widget/atendeai.js'; script.dataset.empresa = tenant; script.dataset.chave = key;
+  document.body.appendChild(script); info.textContent = 'Esta página permite testar a conversa e o encaminhamento ao responsável.';
+} else info.textContent = 'Para abrir o chat, use o link de teste fornecido na configuração da empresa.';
+</script></body></html>

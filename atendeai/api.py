@@ -8,6 +8,7 @@ from typing import Literal
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,6 +17,8 @@ from .catalog import CITIES, SEGMENTS, resolve_city
 from .commercial import CommercialError, CommercialService
 from .commercial_routes import commercial_routers
 from .config import Settings
+from .support import SupportService
+from .support_routes import support_routers
 from .database_ssl import DatabaseSSL
 from .models import Base, ConsentEvent, Lead, as_utc, build_database, utcnow
 from .research import AnalysisError, analyze
@@ -87,14 +90,15 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
         raise
     source = source or (DemoSource() if settings.search_provider == "demo" else OverpassSource(settings.overpass_url))
     commercial = CommercialService(sessions, settings, whatsapp_transport, ai_transport)
+    support = SupportService(sessions, settings, whatsapp_transport, ai_transport)
 
-    async def commercial_worker(stop):
+    async def background_worker(stop, service):
         while not stop.is_set():
             try:
-                await asyncio.to_thread(commercial.process_cycle)
+                await asyncio.to_thread(service.process_cycle)
             except Exception as error:
                 # Não registra payload, token ou dados privados na mensagem de erro.
-                logging.getLogger("atendeai.comercial").error("Falha no processamento comercial: %s", type(error).__name__)
+                logging.getLogger("atendeai.fila").error("Falha no processamento de %s: %s", type(service).__name__, type(error).__name__)
             try:
                 await asyncio.wait_for(stop.wait(), timeout=3)
             except TimeoutError:
@@ -102,25 +106,30 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
 
     @asynccontextmanager
     async def lifespan(app):
-        task, stop = None, asyncio.Event()
+        tasks, stop = [], asyncio.Event()
         try:
             Base.metadata.create_all(engine)
             if settings.whatsapp_ready and settings.environment != "test":
-                task = asyncio.create_task(commercial_worker(stop))
+                tasks.append(asyncio.create_task(background_worker(stop, commercial)))
+            if settings.environment != "test":
+                tasks.append(asyncio.create_task(background_worker(stop, support)))
             yield
         finally:
             stop.set()
             try:
-                if task:
-                    await task
+                if tasks:
+                    await asyncio.gather(*tasks)
             finally:
                 engine.dispose()
                 ssl_files.close()
 
-    app = FastAPI(title="AtendeAI — Pesquisa e Comercial", version="0.2.0", lifespan=lifespan,
+    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.3.0", lifespan=lifespan,
                   description="Pesquisa em São Paulo capital e interior e agente comercial via WhatsApp oficial. Configure o número e as credenciais antes de habilitar o envio. Use Authorize com ADMIN_API_KEY.")
     app.state.settings, app.state.engine, app.state.sessions = settings, engine, sessions
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
+                       allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "X-Site-Key"])
     app.state.commercial = commercial
+    app.state.support = support
     key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
     def admin(key: str | None = Depends(key_header)):
@@ -132,6 +141,9 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
         return JSONResponse(status_code=error.status_code, content={"detail": str(error)})
 
     for router in commercial_routers(commercial, admin):
+        app.include_router(router)
+
+    for router in support_routers(support, admin):
         app.include_router(router)
 
     def session_dependency():
@@ -149,9 +161,9 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
 
     @app.get("/", tags=["Informações"])
     def index():
-        return {"projeto": "AtendeAI", "versao": "0.2.0", "documentacao": "/docs",
+        return {"projeto": "AtendeAI", "versao": "0.3.0", "documentacao": "/docs",
                 "agentes": {"1_pesquisa": "implementado", "2_comercial": "implementado" if settings.whatsapp_ready else "implementado_configuracao_pendente",
-                            "3_atendimento": "etapa_posterior"},
+                            "3_atendimento": "implementado"},
                 "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}
 
     @app.get("/health", tags=["Informações"])

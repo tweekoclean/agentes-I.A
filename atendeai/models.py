@@ -160,6 +160,94 @@ class CommercialQuota(Base):
     opening_attempts: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class SupportTenant(Base):
+    __tablename__ = "support_tenants"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(200))
+    site_key_hash: Mapped[str] = mapped_column(String(64))
+    allowed_origins: Mapped[list] = mapped_column(JSON)
+    welcome_text: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    ai_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    daily_conversation_limit: Mapped[int] = mapped_column(Integer, default=100)
+    daily_ai_limit: Mapped[int] = mapped_column(Integer, default=100)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SupportKnowledge(Base):
+    __tablename__ = "support_knowledge"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("support_tenants.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    content: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SupportConversation(Base):
+    __tablename__ = "support_conversations"
+    __table_args__ = (UniqueConstraint("tenant_id", "channel", "recipient", name="uq_support_recipient"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("support_tenants.id"), index=True)
+    channel: Mapped[str] = mapped_column(String(20))
+    recipient: Mapped[str | None] = mapped_column(String(20))
+    token_hash: Mapped[str | None] = mapped_column(String(64))
+    origin: Mapped[str | None] = mapped_column(String(300))
+    state: Mapped[str] = mapped_column(String(30), default="bot", index=True)
+    pause_reason: Mapped[str | None] = mapped_column(String(100))
+    last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_inbound_id: Mapped[str | None] = mapped_column(String(36))
+    opted_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    auto_replies: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SupportMessage(Base):
+    __tablename__ = "support_messages"
+    __table_args__ = (UniqueConstraint("conversation_id", "client_message_id", name="uq_support_client_message"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("support_tenants.id"), index=True)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("support_conversations.id"), index=True)
+    direction: Mapped[str] = mapped_column(String(10))
+    author: Mapped[str] = mapped_column(String(20))
+    kind: Mapped[str] = mapped_column(String(20), default="text")
+    text: Mapped[str] = mapped_column(Text)
+    client_message_id: Mapped[str | None] = mapped_column(String(64))
+    reply_to_id: Mapped[str | None] = mapped_column(ForeignKey("support_messages.id"), unique=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(250), unique=True)
+    sender_id: Mapped[str | None] = mapped_column(String(25))
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    delivery_status: Mapped[str | None] = mapped_column(String(20))
+    engine: Mapped[str | None] = mapped_column(String(60))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    processing_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SupportHandoff(Base):
+    __tablename__ = "support_handoffs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("support_tenants.id"), index=True)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("support_conversations.id"), index=True)
+    reason: Mapped[str] = mapped_column(String(100))
+    summary: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="aberto", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SupportQuota(Base):
+    __tablename__ = "support_quotas"
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("support_tenants.id"), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    conversations_opened: Mapped[int] = mapped_column(Integer, default=0)
+    ai_calls: Mapped[int] = mapped_column(Integer, default=0)
+
+
 def build_database(url: str, *, connect_args=None):
     options = {"pool_pre_ping": True}
     if url.startswith("sqlite"):

@@ -1,6 +1,6 @@
 # Agente 2 — WhatsApp comercial
 
-Esta etapa apresenta a proposta da AtendeAI aos contatos autorizados, registra respostas e encaminha interessados ao responsável. O número conectado aqui é o número comercial da AtendeAI. Conectar números e sites de várias empresas contratantes será a etapa 3.
+Esta etapa apresenta a proposta da AtendeAI aos contatos autorizados, registra respostas e encaminha interessados ao responsável. O número conectado aqui é o número comercial da AtendeAI. Para conectar números e sites de empresas contratantes, use [AGENTE-3.md](AGENTE-3.md).
 
 ## Conferir a implantação
 

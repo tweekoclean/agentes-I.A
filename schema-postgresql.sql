@@ -1,4 +1,4 @@
--- AtendeAI 0.2.0: criar em um banco vazio, uma única vez.
+-- AtendeAI 0.3.0: criar em um banco vazio, uma única vez.
 
 CREATE TABLE commercial_quotas (
 	day DATE NOT NULL,
@@ -202,3 +202,110 @@ CREATE INDEX ix_commercial_messages_status ON commercial_messages (status);
 CREATE INDEX ix_commercial_messages_lead_id ON commercial_messages (lead_id);
 
 CREATE INDEX ix_commercial_messages_conversation_id ON commercial_messages (conversation_id);
+
+CREATE TABLE support_tenants (
+	id VARCHAR(36) NOT NULL,
+	name VARCHAR(200) NOT NULL,
+	site_key_hash VARCHAR(64) NOT NULL,
+	allowed_origins JSON NOT NULL,
+	welcome_text TEXT NOT NULL,
+	active BOOLEAN NOT NULL,
+	ai_enabled BOOLEAN NOT NULL,
+	daily_conversation_limit INTEGER NOT NULL,
+	daily_ai_limit INTEGER NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	PRIMARY KEY (id)
+);
+
+CREATE TABLE support_knowledge (
+	id VARCHAR(36) NOT NULL,
+	tenant_id VARCHAR(36) NOT NULL,
+	title VARCHAR(200) NOT NULL,
+	content TEXT NOT NULL,
+	active BOOLEAN NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	PRIMARY KEY (id),
+	FOREIGN KEY(tenant_id) REFERENCES support_tenants (id)
+);
+
+CREATE TABLE support_conversations (
+	id VARCHAR(36) NOT NULL,
+	tenant_id VARCHAR(36) NOT NULL,
+	channel VARCHAR(20) NOT NULL,
+	recipient VARCHAR(20),
+	token_hash VARCHAR(64),
+	origin VARCHAR(300),
+	state VARCHAR(30) NOT NULL,
+	pause_reason VARCHAR(100),
+	last_inbound_at TIMESTAMP WITH TIME ZONE,
+	last_inbound_id VARCHAR(36),
+	opted_out_at TIMESTAMP WITH TIME ZONE,
+	resumed_at TIMESTAMP WITH TIME ZONE,
+	auto_replies INTEGER NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	PRIMARY KEY (id),
+	CONSTRAINT uq_support_recipient UNIQUE (tenant_id, channel, recipient),
+	FOREIGN KEY(tenant_id) REFERENCES support_tenants (id)
+);
+
+CREATE TABLE support_messages (
+	id VARCHAR(36) NOT NULL,
+	tenant_id VARCHAR(36) NOT NULL,
+	conversation_id VARCHAR(36) NOT NULL,
+	direction VARCHAR(10) NOT NULL,
+	author VARCHAR(20) NOT NULL,
+	kind VARCHAR(20) NOT NULL,
+	text TEXT NOT NULL,
+	client_message_id VARCHAR(64),
+	reply_to_id VARCHAR(36),
+	provider_message_id VARCHAR(250),
+	sender_id VARCHAR(25),
+	status VARCHAR(40) NOT NULL,
+	delivery_status VARCHAR(20),
+	engine VARCHAR(60),
+	attempts INTEGER NOT NULL,
+	error TEXT,
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	processing_at TIMESTAMP WITH TIME ZONE,
+	PRIMARY KEY (id),
+	CONSTRAINT uq_support_client_message UNIQUE (conversation_id, client_message_id),
+	FOREIGN KEY(tenant_id) REFERENCES support_tenants (id),
+	FOREIGN KEY(conversation_id) REFERENCES support_conversations (id),
+	UNIQUE (reply_to_id),
+	FOREIGN KEY(reply_to_id) REFERENCES support_messages (id),
+	UNIQUE (provider_message_id)
+);
+
+CREATE TABLE support_handoffs (
+	id VARCHAR(36) NOT NULL,
+	tenant_id VARCHAR(36) NOT NULL,
+	conversation_id VARCHAR(36) NOT NULL,
+	reason VARCHAR(100) NOT NULL,
+	summary TEXT NOT NULL,
+	status VARCHAR(20) NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	closed_at TIMESTAMP WITH TIME ZONE,
+	PRIMARY KEY (id),
+	FOREIGN KEY(tenant_id) REFERENCES support_tenants (id),
+	FOREIGN KEY(conversation_id) REFERENCES support_conversations (id)
+);
+
+CREATE TABLE support_quotas (
+	tenant_id VARCHAR(36) NOT NULL,
+	day DATE NOT NULL,
+	conversations_opened INTEGER NOT NULL,
+	ai_calls INTEGER NOT NULL,
+	PRIMARY KEY (tenant_id, day),
+	FOREIGN KEY(tenant_id) REFERENCES support_tenants (id)
+);
+CREATE INDEX ix_support_knowledge_tenant_id ON support_knowledge (tenant_id);
+CREATE INDEX ix_support_conversations_tenant_id ON support_conversations (tenant_id);
+CREATE INDEX ix_support_conversations_state ON support_conversations (state);
+CREATE INDEX ix_support_messages_tenant_id ON support_messages (tenant_id);
+CREATE INDEX ix_support_messages_conversation_id ON support_messages (conversation_id);
+CREATE INDEX ix_support_messages_status ON support_messages (status);
+CREATE INDEX ix_support_handoffs_tenant_id ON support_handoffs (tenant_id);
+CREATE INDEX ix_support_handoffs_conversation_id ON support_handoffs (conversation_id);
+CREATE INDEX ix_support_handoffs_status ON support_handoffs (status);

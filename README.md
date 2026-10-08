@@ -1,4 +1,4 @@
-# AtendeAI — pesquisa e agente comercial, versão 0.2.0
+# AtendeAI — pesquisa, comercial e atendimento, versão 0.3.0
 
 Plataforma organizada em três módulos:
 
@@ -6,9 +6,9 @@ Plataforma organizada em três módulos:
 | --- | --- | --- |
 | Agente 1 | Encontrar, organizar e analisar possíveis clientes | Implementado |
 | Agente 2 | Apresentar o serviço e acompanhar interessados | Implementado; ativação depende da configuração do WhatsApp oficial |
-| Agente 3 | Atender clientes das empresas pelo site ou WhatsApp | Etapa posterior |
+| Agente 3 | Atender clientes das empresas pelo site ou WhatsApp | API e chat de site implementados; contas WhatsApp dependem de configuração |
 
-Os módulos podem usar o mesmo provedor de IA, com instruções e permissões distintas. Não é necessário contratar três modelos diferentes. Esta versão implementa pesquisa e conversa comercial; o atendimento das empresas contratantes será a etapa 3.
+Os módulos podem usar o mesmo provedor de IA, com instruções e permissões distintas. Não é necessário contratar três modelos diferentes. Esta versão inclui os três módulos. O atendimento tem uma base de respostas e conversas por empresa; o WhatsApp usa as credenciais da conta de cada cliente.
 
 ## Pesquisa e cobertura
 
@@ -182,11 +182,15 @@ O primeiro contato usa template, com revisão manual da mensagem. As respostas d
 
 O banco registra fila, entradas, respostas, encaminhamentos, pedidos de interrupção e status de entrega. Uma aceitação da API não é confirmação de entrega. Falhas incertas não são reenviadas automaticamente. Há uma abordagem inicial por destinatário e limite diário configurável, inicialmente 100 tentativas/reservas no fuso de São Paulo. Os limites, custos e regras do WhatsApp continuam valendo.
 
-## Depois: atendimento por site e WhatsApp
+## Atendimento por site e WhatsApp
 
-O agente 3 terá configuração e dados separados por empresa contratante. Um chat no site enviará mensagens para sua API; o WhatsApp entregará mensagens por webhook autenticado. O sistema receberá a conversa, verificará a empresa e o cliente, consultará a base de conhecimento e as APIs autorizadas, e responderá no mesmo canal.
+O agente 3 está implementado com cadastro de empresas contratantes, origens permitidas, base de respostas, conversas privadas e chamados. O widget incorporável usa a API da AtendeAI; cada conta WhatsApp tem um webhook assinado e credenciais separadas no ambiente.
 
-Se precisar de uma pessoa, o sistema deverá primeiro registrar e encaminhar o chamado com histórico e resumo. Depois, pode responder: “Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento.” A IA ficará pausada naquela conversa enquanto a equipe assumir. A integração do cliente e o painel dessa etapa ainda não estão implementados.
+Quando precisar de uma pessoa, o sistema grava um chamado com acesso ao histórico, pausa o bot e responde: “Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento.” O operador consulta os chamados e responde pela API, na mesma conversa. Não há painel visual de operadores ou aviso externo nesta versão.
+
+A IA é ativada por empresa. Sem chave/ativação, perguntas com correspondência na base recebem o texto cadastrado e outras dúvidas são encaminhadas. Há limites diários configuráveis de novas conversas e chamadas de IA, e tokens próprios para os visitantes. A chave administrativa nunca entra no widget.
+
+Consulte [AGENTE-3.md](AGENTE-3.md) para cadastrar respostas, copiar o widget para seu site, abrir a página de teste e configurar o WhatsApp de cada empresa. Não há consulta ou alteração de pedidos/pagamentos em sistemas externos.
 
 ## Verificação
 
