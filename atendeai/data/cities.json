@@ -1,0 +1,122 @@
+[
+  {
+    "nome": "São Paulo",
+    "codigo_ibge": "3550308",
+    "uf": "SP",
+    "area": "capital"
+  },
+  {
+    "nome": "Campinas",
+    "codigo_ibge": "3509502",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Sorocaba",
+    "codigo_ibge": "3552205",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Ribeirão Preto",
+    "codigo_ibge": "3543402",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "São José do Rio Preto",
+    "codigo_ibge": "3549805",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Jundiaí",
+    "codigo_ibge": "3525904",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Bauru",
+    "codigo_ibge": "3506003",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Piracicaba",
+    "codigo_ibge": "3538709",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "São José dos Campos",
+    "codigo_ibge": "3549904",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Taubaté",
+    "codigo_ibge": "3554102",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Araraquara",
+    "codigo_ibge": "3503208",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Franca",
+    "codigo_ibge": "3516200",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Presidente Prudente",
+    "codigo_ibge": "3541406",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Marília",
+    "codigo_ibge": "3529005",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Americana",
+    "codigo_ibge": "3501608",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Limeira",
+    "codigo_ibge": "3526902",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Indaiatuba",
+    "codigo_ibge": "3520509",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Itu",
+    "codigo_ibge": "3523909",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "Botucatu",
+    "codigo_ibge": "3507506",
+    "uf": "SP",
+    "area": "interior"
+  },
+  {
+    "nome": "São Carlos",
+    "codigo_ibge": "3548906",
+    "uf": "SP",
+    "area": "interior"
+  }
+]

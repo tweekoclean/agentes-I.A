@@ -1,0 +1,14 @@
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+certs/
+.venv/
+__pycache__/
+*.db
+*.sqlite
+*.zip
+tests/
