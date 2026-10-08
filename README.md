@@ -10,6 +10,8 @@ Plataforma organizada em três módulos:
 
 Os módulos podem usar o mesmo provedor de IA, com instruções e permissões distintas. Não é necessário contratar três modelos diferentes. Esta versão inclui os três módulos. O atendimento tem uma base de respostas e conversas por empresa; o WhatsApp usa as credenciais da conta de cada cliente.
 
+Abra [a demonstração do atendimento no site](https://atendeai-co.squareweb.app/demonstracao) para testar as respostas da base e o encaminhamento. A demonstração não ativa IA paga nem conecta um número WhatsApp.
+
 ## Pesquisa e cobertura
 
 Fonte inicial: OpenStreetMap consultado pela API Overpass. Nenhuma chave paga é necessária para testar essa fonte. Há cache por cidade, segmentos, limite e provedor. Chamadas não atendidas pelo cache respeitam um intervalo global registrado no banco; não são disparadas em massa.

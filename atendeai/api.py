@@ -109,6 +109,8 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
         tasks, stop = [], asyncio.Event()
         try:
             Base.metadata.create_all(engine)
+            if settings.support_demo_enabled and settings.environment != "test":
+                support.ensure_demo()
             if settings.whatsapp_ready and settings.environment != "test":
                 tasks.append(asyncio.create_task(background_worker(stop, commercial)))
             if settings.environment != "test":

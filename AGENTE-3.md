@@ -105,3 +105,9 @@ SAIR interrompe a conversa e cancela textos pendentes. Um “oi” posterior nã
 O deploy cria seis novas tabelas sem modificar as existentes. PostgreSQL, certificados e chave administrativa continuam no ambiente. Não execute o SQL completo no banco atual: create_all cria o que falta. O SQL completo é para um banco vazio.
 
 Referências: [política WhatsApp Business](https://business.whatsapp.com/policy), [webhooks da Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint/) e [saída estruturada OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs).
+
+## Demonstração pronta
+
+Abra [a demonstração](https://atendeai-co.squareweb.app/demonstracao). Ela usa um cadastro separado chamado AtendeAI — Demonstração, com respostas por regras/base, sem ativação de IA paga ou conta WhatsApp. Pergunte “quais serviços vocês oferecem?” e depois “quero falar com um atendente”. O segundo pedido cria um chamado real na fila dessa empresa de teste e pausa o bot. Use as rotas administrativas da empresa 00000000-0000-4000-a000-000000000003 para consultar/responder.
+
+SUPPORT_DEMO_ENABLED=false desativa a página e a criação inicial da demonstração. A inicialização preserva alterações anteriores e não duplica a empresa/base. Desative também a empresa pela API se desejar bloquear sessões já abertas. O teto padrão é de 100 novas conversas por dia para a demonstração.

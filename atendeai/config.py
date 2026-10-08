@@ -35,6 +35,7 @@ class Settings:
     commercial_daily_limit: int = 100
     commercial_max_auto_replies: int = 6
     support_whatsapp_accounts: dict = field(default_factory=dict, repr=False)
+    support_demo_enabled: bool = True
 
     @classmethod
     def from_env(cls):
@@ -66,6 +67,7 @@ class Settings:
             commercial_daily_limit=int(os.getenv("COMMERCIAL_DAILY_LIMIT", "100")),
             commercial_max_auto_replies=int(os.getenv("COMMERCIAL_MAX_AUTO_REPLIES", "6")),
             support_whatsapp_accounts=parse_support_accounts(os.getenv("SUPPORT_WHATSAPP_ACCOUNTS_JSON", "{}")),
+            support_demo_enabled=env_bool("SUPPORT_DEMO_ENABLED", True),
         )
 
     def whatsapp_missing(self):

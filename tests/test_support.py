@@ -385,6 +385,28 @@ class SupportTests(unittest.TestCase):
             self.assertEqual(output.status, "envio_incerto")
             self.assertNotIn("fake-support-token", output.error)
 
+    def test_demo_is_idempotent_and_never_activates_paid_ai(self):
+        from atendeai.support import DEMO_TENANT_ID, DEMO_SITE_KEY, DEMO_ORIGIN
+        self.service.ensure_demo()
+        self.service.ensure_demo()
+        with self.sessions() as session:
+            self.assertEqual(session.scalar(select(func.count()).select_from(SupportTenant)), 1)
+            tenant = session.get(SupportTenant, DEMO_TENANT_ID)
+            self.assertFalse(tenant.ai_enabled)
+            self.assertEqual(tenant.name, "AtendeAI — Demonstração")
+        response = self.client.get("/demonstracao", follow_redirects=False)
+        self.assertEqual(response.status_code, 307)
+        chat = self.chat({"id": DEMO_TENANT_ID, "chave_site": DEMO_SITE_KEY}, origin=DEMO_ORIGIN)
+        path = self.path({"id": DEMO_TENANT_ID}, chat)
+        headers = {"Origin": DEMO_ORIGIN, "Authorization": "Bearer " + chat["token_conversa"]}
+        sent = self.client.post(path, headers=headers, json={"texto": "quais serviços vocês oferecem?", "id_cliente": "demo-1"})
+        self.assertEqual(sent.status_code, 200)
+        self.service.process_cycle()
+        history = self.client.get(path, headers=headers).json()
+        self.assertEqual(history["mensagens"][-1]["modo"], "base_sem_ia")
+        self.assertEqual(self.ai_calls, [])
+        self.assertEqual(self.calls, [])
+
 
 class SupportConfigurationTests(unittest.TestCase):
     def test_environment_accounts_are_private_and_duplicates_rejected(self):

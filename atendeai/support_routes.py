@@ -7,13 +7,13 @@ import secrets
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 
 from .commercial import CommercialError
 from .models import SupportConversation, SupportHandoff, SupportKnowledge, SupportMessage, SupportTenant, as_utc, utcnow
-from .support import digest, support_conversation_data, support_message_data
+from .support import DEMO_SITE_KEY, DEMO_TENANT_ID, digest, support_conversation_data, support_message_data
 
 
 class SupportBody(BaseModel):
@@ -199,6 +199,14 @@ def support_routers(service, admin):
     def widget():
         return FileResponse(Path(__file__).parent / "static" / "widget.js", media_type="application/javascript",
                             headers={"Cache-Control": "public, max-age=300"})
+
+    @public.get("/demonstracao", include_in_schema=False)
+    def demonstration():
+        if not service.settings.support_demo_enabled:
+            raise HTTPException(404, "Demonstração desativada.")
+        with service.sessions() as session:
+            service.tenant(session, DEMO_TENANT_ID, active=True)
+        return RedirectResponse(f"/teste-atendimento?empresa={DEMO_TENANT_ID}&chave={DEMO_SITE_KEY}")
 
     @public.get("/teste-atendimento", include_in_schema=False)
     def test_chat():

@@ -14,6 +14,10 @@ from .service import db_insert
 from .support_brain import decide_support, select_knowledge
 
 
+DEMO_TENANT_ID = "00000000-0000-4000-a000-000000000003"
+DEMO_SITE_KEY = "atendeai-demonstracao-publica"
+DEMO_ORIGIN = "https://atendeai-co.squareweb.app"
+
 SUPPORT_HANDOFF = "Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento."
 
 
@@ -40,6 +44,28 @@ class SupportService:
     def __init__(self, sessions, settings, whatsapp_transport=None, ai_transport=None):
         self.sessions, self.settings = sessions, settings
         self.whatsapp_transport, self.ai_transport = whatsapp_transport, ai_transport
+
+    def ensure_demo(self):
+        """Demonstração pública separada, sem IA paga ou conta WhatsApp."""
+        with self.sessions() as session:
+            session.execute(db_insert(session, SupportTenant).values(
+                id=DEMO_TENANT_ID, name="AtendeAI — Demonstração", site_key_hash=digest(DEMO_SITE_KEY),
+                allowed_origins=[DEMO_ORIGIN],
+                welcome_text="Olá! Esta é uma demonstração do atendimento da AtendeAI. Pergunte quais serviços oferecemos ou como funciona o encaminhamento para uma pessoa.",
+                active=True, ai_enabled=False, daily_conversation_limit=100, daily_ai_limit=1)
+                .on_conflict_do_nothing(index_elements=["id"]))
+            examples = [
+                ("00000000-0000-4000-a000-000000000031", "Serviços da AtendeAI",
+                 "A proposta da AtendeAI é automatizar o atendimento por site e WhatsApp, organizar as conversas e encaminhar dúvidas para uma pessoa quando necessário. O WhatsApp depende da configuração oficial da conta."),
+                ("00000000-0000-4000-a000-000000000032", "Encaminhamento para uma pessoa",
+                 "Quando o assistente precisa de uma pessoa, registra um chamado com histórico e pausa as respostas automáticas. O responsável acompanha a fila e responde na mesma conversa."),
+                ("00000000-0000-4000-a000-000000000033", "Como funciona no WhatsApp",
+                 "O atendimento pelo WhatsApp usa a API oficial da Meta e a conta autorizada de cada empresa. Esta demonstração funciona pelo site; nenhum número real do WhatsApp está conectado nela."),
+            ]
+            for identifier, title, content in examples:
+                session.execute(db_insert(session, SupportKnowledge).values(id=identifier, tenant_id=DEMO_TENANT_ID,
+                    title=title, content=content, active=True).on_conflict_do_nothing(index_elements=["id"]))
+            session.commit()
 
     @staticmethod
     def tenant(session, identifier, active=False, lock=False):
