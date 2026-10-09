@@ -27,17 +27,17 @@ jobs:
                   try:
                       response = client.get(base + "/")
                       response.raise_for_status()
-                      if response.json().get("versao") == "0.8.0":
+                      if response.json().get("versao") == "0.9.0":
                           break
                   except (httpx.HTTPError, ValueError):
                       pass
                   if attempt == 17:
-                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.8.0.")
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.9.0.")
                   time.sleep(5)
               health = client.get(base + "/health")
               health.raise_for_status()
               assert health.json()["status"] == "ok"
-              print("Versão 0.8.0 publicada; banco conectado.")
+              print("Versão 0.9.0 publicada; banco conectado.")
               for route in ("/painel", "/painel/painel.css", "/painel/painel.js", "/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.png", "/home/home.css", "/home/home.js"):
                   panel = client.get(base + route)
                   panel.raise_for_status()
@@ -51,9 +51,19 @@ jobs:
               assert "Fale com um especialista" in landing.text
               assert 'id="application-modal"' in landing.text
               assert 'id="services-story"' in landing.text
+              assert 'id="nelvo-film"' in landing.text
+              assert 'services-footer' not in landing.text
               form = client.get(base + "/aplicar/conteudo")
               assert 'id="public-application-form"' in form.text
               assert form.text in client.get(base + "/aplicar").text
+              video = client.get(base + "/home/visuais/nelvo-intro.mp4", headers={"Range": "bytes=0-31"})
+              assert video.status_code == 206
+              assert b"ftyp" in video.content
+              for asset in ("nelvo-poster.jpg", "nelvo-connected.png", "nelvo-studio.png"):
+                  visual = client.get(base + "/home/visuais/" + asset, headers={"Range": "bytes=0-31"})
+                  assert visual.status_code == 206
+              captions = client.get(base + "/home/visuais/nelvo-intro.vtt")
+              assert captions.status_code == 200 and captions.text.startswith("WEBVTT")
               catalog = client.get(base + "/publico/aplicacoes/catalogo")
               catalog.raise_for_status()
               assert "RJ" in catalog.json()["estados"]

@@ -1,4 +1,4 @@
--- Nelvo Company 0.8.0: criar em um banco vazio, uma única vez.
+-- Nelvo Company 0.9.0: criar em um banco vazio, uma única vez.
 
 CREATE TABLE application_rates (
 	key VARCHAR(100) NOT NULL,

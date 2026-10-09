@@ -35,19 +35,17 @@ async function noOverflow(page, label) {
 }
 async function scrollService(page, index, label) {
   await page.evaluate((index) => {
-    const story = document.getElementById("services-story");
-    const pin = story.querySelector(".services-pin");
-    const top = parseFloat(getComputedStyle(pin).top);
-    const distance = story.offsetHeight - pin.offsetHeight;
-    window.scrollTo({ top: window.scrollY + story.getBoundingClientRect().top - top + distance * ((index + .5) / 4), behavior: "instant" });
+    const marker = document.getElementById("service-marker-" + index);
+    const panel = document.getElementById("service-panel-" + index);
+    const top = parseFloat(getComputedStyle(panel).top) || 110;
+    window.scrollTo({ top: window.scrollY + marker.getBoundingClientRect().top - top + 10, behavior: "instant" });
   }, index);
-  await waitFor(async () => await page.locator("#service-tab-" + index).getAttribute("aria-selected") === "true", label);
-  assert.equal(await page.locator(".solution-card:visible").count(), 1, "Um serviço por vez");
+  await waitFor(async () => await page.locator("#service-tab-" + index).getAttribute("aria-current") === "step", label);
+  assert.equal(await page.locator(".solution-card").count(), 4, "Os quatro cartões mantêm o conteúdo acessível");
   await delay(550);
   await noOverflow(page, label);
-  const pin = await page.locator(".services-pin").boundingBox();
-  const viewport = page.viewportSize();
-  assert(pin.y >= 0 && pin.y + pin.height <= viewport.height + 3, label + " fica visível durante o scroll");
+  const card = await page.locator("#service-panel-" + index).boundingBox();
+  assert(card.y >= 0 && card.y < page.viewportSize().height, label + " visível durante o scroll");
   await page.screenshot({ path: path.join(output, label + ".png") });
 }
 
@@ -94,11 +92,11 @@ async function scrollService(page, index, label) {
   assert.equal(await applicant.locator(".nelvo-logo img").first().evaluate((img) => img.complete && img.naturalWidth > 0), true, "Logo original carregada");
   await applicant.screenshot({ path: path.join(output, "home-desktop.png"), fullPage: true });
   await applicant.screenshot({ path: path.join(output, "home-hero-desktop.png") });
+  assert.equal(await applicant.locator("#nelvo-film").count(), 1);
+  assert.equal(await applicant.locator("#nelvo-film").evaluate(el => el.controls && el.muted && el.playsInline), true);
+  assert.equal(await applicant.locator(".about-art img,.studio-showcase img").count(), 2);
+  assert.equal(await applicant.locator(".services-footer").count(), 0, "Faixa removida");
   for (let index = 0; index < 4; index++) await scrollService(applicant, index, "servico-desktop-" + (index + 1));
-  await applicant.locator("#motion-toggle").click();
-  assert.equal(await applicant.locator("#motion-toggle").getAttribute("aria-pressed"), "true");
-  assert.equal(await applicant.locator(".redesign-scan").evaluate((el) => getComputedStyle(el).animationPlayState), "paused");
-  await applicant.locator("#motion-toggle").click();
   await applicant.evaluate(() => window.scrollTo({top: 0, behavior: "instant"}));
   await applicant.locator(".hero-actions .cta").click();
   assert.equal(new URL(applicant.url()).pathname, "/");
@@ -257,10 +255,11 @@ async function scrollService(page, index, label) {
   await applicant.screenshot({ path: path.join(output, "popup-projeto-mobile.png") });
   await applicant.locator("#application-modal-close").click();
   await applicant.emulateMedia({ reducedMotion: "reduce" });
+  assert.equal(await applicant.locator("#nelvo-film").evaluate(el => el.paused), true);
   await applicant.locator("#service-tab-0").click();
   await applicant.keyboard.press("ArrowRight");
-  assert.equal(await applicant.locator("#service-tab-1").getAttribute("aria-selected"), "true");
-  assert.equal(await applicant.locator(".services-pin").evaluate((el) => getComputedStyle(el).position), "static");
+  assert.equal(await applicant.locator("#service-tab-1").getAttribute("aria-current"), "step");
+  assert.equal(await applicant.locator("#service-panel-1").evaluate((el) => getComputedStyle(el).position), "relative");
   await applicant.emulateMedia({ reducedMotion: "no-preference" });
   await applicant.evaluate(() => window.scrollTo({top: 0, behavior: "instant"}));
   await applicant.locator("#home-menu-toggle").click();
@@ -288,7 +287,7 @@ async function scrollService(page, index, label) {
   // Conteúdo permanece acessível mesmo em uma tela estreita ou baixa.
   await applicant.setViewportSize({ width: 320, height: 780 });
   await applicant.locator("#service-tab-3").click();
-  assert.equal(await applicant.locator(".services-pin").evaluate((el) => getComputedStyle(el).position), "static");
+  assert.equal(await applicant.locator("#service-tab-3").getAttribute("aria-current"), "step");
   await noOverflow(applicant, "Home estreita");
   await applicant.setViewportSize({ width: 768, height: 1024 });
   await scrollService(applicant, 2, "servico-tablet");

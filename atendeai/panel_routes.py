@@ -63,6 +63,15 @@ def panel_router():
     def home_script():
         return FileResponse(STATIC / "home.js", media_type="application/javascript", headers=HEADERS)
 
+    @router.get("/home/visuais/{asset}", include_in_schema=False)
+    def visual_asset(asset: str):
+        from fastapi import HTTPException
+        types = {"nelvo-intro.mp4": "video/mp4", "nelvo-intro.vtt": "text/vtt",
+                 "nelvo-poster.jpg": "image/jpeg", "nelvo-connected.png": "image/png", "nelvo-studio.png": "image/png"}
+        if asset not in types:
+            raise HTTPException(status_code=404, detail="Recurso não encontrado.")
+        return FileResponse(STATIC / "media" / asset, media_type=types[asset], headers=HEADERS)
+
     @router.get("/marca.png", include_in_schema=False)
     def original_brand():
         return FileResponse(STATIC / "nelvo-logo-transparent.png", media_type="image/png", headers=HEADERS)

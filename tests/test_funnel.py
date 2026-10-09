@@ -62,7 +62,7 @@ class FunnelTests(unittest.TestCase):
         self.assertEqual(logo.headers["content-type"], "image/png")
         self.assertTrue(logo.content.startswith(b"\x89PNG"))
         self.assertIn("Accept", html.headers["vary"])
-        self.assertEqual(self.client.get("/").json()["versao"], "0.8.0")
+        self.assertEqual(self.client.get("/").json()["versao"], "0.9.0")
 
     def test_public_submission_stores_application_without_customer_or_outreach(self):
         body = application(); identifier = self.submit(body)
@@ -78,6 +78,19 @@ class FunnelTests(unittest.TestCase):
         self.assertEqual(rows[0]["whatsapp"], body["whatsapp"])
         self.assertEqual(rows[0]["etapa"], "nova")
         self.assertEqual(self.client.get("/v1/comercial/mensagens", headers=HEADERS).json()["mensagens"], [])
+
+    def test_public_video_supports_seeking_and_only_serves_allowed_assets(self):
+        video = self.client.get("/home/visuais/nelvo-intro.mp4")
+        self.assertEqual(video.status_code, 200)
+        self.assertEqual(video.headers["content-type"], "video/mp4")
+        self.assertIn(b"ftyp", video.content[:32])
+        partial = self.client.get("/home/visuais/nelvo-intro.mp4", headers={"Range": "bytes=0-31"})
+        self.assertEqual(partial.status_code, 206)
+        self.assertEqual(partial.content, video.content[:32])
+        self.assertEqual(self.client.get("/home/visuais/application-form.html").status_code, 404)
+        captions = self.client.get("/home/visuais/nelvo-intro.vtt")
+        self.assertEqual(captions.status_code, 200)
+        self.assertTrue(captions.text.startswith("WEBVTT"))
 
     def test_invalid_fields_scope_and_contact_permission(self):
         for change in ({"autoriza_contato": False}, {"cidade": " "}, {"uf": "ZZ"}, {"segmento": "invalido"},
