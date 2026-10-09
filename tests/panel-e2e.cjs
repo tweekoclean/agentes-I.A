@@ -28,7 +28,7 @@ async function get(route, administrative = false) {
   assert.equal(response.status, 200, "GET " + route);
   return response.json();
 }
-async function visible(page, selector) { await page.locator(selector).waitFor({ state: "visible", timeout: 20000 }); }
+async function visible(page, selector) { await page.locator(selector).first().waitFor({ state: "visible", timeout: 20000 }); }
 async function noOverflow(page, label) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   assert.equal(overflow, false, label + " cabe na tela");
@@ -60,6 +60,109 @@ async function noOverflow(page, label) {
   await waitFor(async () => (await panel.locator("#company-select").inputValue()) === fixtures.first.id, "empresa inicial");
   assert.equal(await panel.locator("#admin-key").inputValue(), "");
   assert.equal(await panel.evaluate((key) => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(key), KEY), false);
+
+  await visible(panel, "#view-dashboard");
+  await visible(panel, ".metric");
+  await noOverflow(panel, "Central Nelvo desktop");
+  await panel.screenshot({ path: path.join(output, "nelvo-dashboard-desktop.png"), fullPage: true });
+
+  // Formulário público real: três etapas, revisão segura, recibo e aplicação no funil privado.
+  const applicant = await context.newPage();
+  applicant.on("pageerror", (error) => errors.push(error.message));
+  await applicant.goto(base + "/");
+  await visible(applicant, "#apply-company");
+  await noOverflow(applicant, "Aplicação desktop");
+  await applicant.screenshot({ path: path.join(output, "aplicacao-desktop.png"), fullPage: true });
+  await applicant.locator("#apply-company").fill('Pizzaria do Bairro <img src=x onerror="window.__xss=true">');
+  await applicant.locator("#apply-city").selectOption("Campinas");
+  await applicant.locator("#apply-segment").selectOption("restaurantes");
+  await applicant.locator("#apply-contact").fill("Responsável Fictício");
+  await applicant.locator("#apply-phone").fill("(19) 91234-5678");
+  await applicant.locator("#application-next").click();
+  await visible(applicant, "#apply-volume");
+  await applicant.locator("#apply-volume").selectOption("31_100");
+  await applicant.locator("#apply-goal").fill("Responder dúvidas sobre cardápio, horários e entrega.");
+  await applicant.locator("#application-next").click();
+  await visible(applicant, "#public-summary");
+  assert.equal(await applicant.evaluate(() => Boolean(window.__xss)), false);
+  await applicant.locator("#application-back").click();
+  assert.equal(await applicant.locator("#apply-volume").inputValue(), "31_100");
+  await applicant.locator("#application-next").click();
+  await applicant.locator("#apply-consent").check();
+  await applicant.locator("#application-submit").click();
+  await visible(applicant, "#public-success");
+  await panel.locator('[data-view="funnel"]').click();
+  await visible(panel, ".application-card");
+  const applicationCard = panel.locator(".application-card").filter({ hasText: "Pizzaria do Bairro" });
+  await applicationCard.click();
+  await visible(panel, "#funnel-dialog");
+  assert.equal(await panel.locator("#application-convert").isEnabled(), false);
+  await panel.locator("#application-stage").selectOption("proposta");
+  await panel.locator("#application-notes").fill("Demonstração concluída; proposta apresentada.");
+  await panel.locator('#funnel-detail-form button[type="submit"]').click();
+  await waitFor(async () => (await get("/v1/funil", true)).aplicacoes.some((item) => item.nome_empresa.startsWith("Pizzaria do Bairro") && item.etapa === "proposta"), "etapa persistida");
+  await waitFor(async () => await panel.locator('#funnel-detail-form button[type="submit"]').isEnabled(), "atualização do formulário concluída");
+  await panel.locator("#funnel-dialog .close-dialog").click();
+  await panel.screenshot({ path: path.join(output, "funil-desktop.png"), fullPage: true });
+  await applicationCard.click();
+  await panel.locator("#application-stage").selectOption("ganha");
+  await panel.locator('#funnel-detail-form button[type="submit"]').click();
+  await waitFor(async () => await panel.locator("#application-convert").isEnabled(), "cadastro liberado após contratação");
+  await panel.locator("#application-convert").click();
+  await visible(panel, "#company-dialog");
+  await panel.locator('#company-form button[type="submit"]').click();
+  await visible(panel, "#integration-code");
+  assert.equal(await panel.evaluate(() => Boolean(window.__xss)), false);
+  const apps = (await get("/v1/funil", true)).aplicacoes;
+  assert(apps.find((item) => item.nome_empresa.startsWith("Pizzaria do Bairro")).cliente_id, "Aplicação vinculada ao serviço do cliente");
+
+  // Pesquisa e abordagem da Nelvo: revisão, autorização, rascunho e aprovação, sem enviar WhatsApp.
+  await panel.locator('[data-view="research"]').click();
+  await visible(panel, ".lead-row");
+  await panel.locator(".lead-row").filter({ hasText: "Restaurante Jardim" }).getByRole("button", { name: "Abrir empresa →" }).click();
+  await visible(panel, "#lead-dialog");
+  await panel.locator("#lead-review").selectOption("aprovada");
+  await panel.locator('#lead-review-form button[type="submit"]').click();
+  await waitFor(async () => (await get("/v1/empresas/" + fixtures.lead_id, true)).revisao === "aprovada", "revisão da empresa");
+  await panel.locator("#lead-evidence").fill("Autorização fictícia do responsável registrada exclusivamente para este teste automatizado.");
+  await panel.locator('#lead-consent-form button[type="submit"]').click();
+  await waitFor(async () => (await get("/v1/empresas/" + fixtures.lead_id, true)).consentimento_whatsapp === "concedido", "autorização comercial");
+  await panel.locator("#lead-add-funnel").click();
+  await visible(panel, "#view-funnel");
+  await panel.locator('[data-view="research"]').click();
+  await panel.locator(".lead-row").filter({ hasText: "Restaurante Jardim" }).getByRole("button", { name: "Abrir empresa →" }).click();
+  await panel.locator("#lead-draft").click();
+  await visible(panel, ".commercial-card");
+  await panel.getByText(/Aqui é da Nelvo Company/).waitFor();
+  await panel.getByRole("button", { name: "Aprovar rascunho" }).click();
+  await panel.getByRole("button", { name: "Enfileirar envio" }).waitFor();
+  assert.equal(await panel.getByRole("button", { name: "Enfileirar envio" }).isEnabled(), false, "Envio bloqueado sem Meta configurada");
+  await noOverflow(panel, "Comercial desktop");
+  await panel.screenshot({ path: path.join(output, "comercial-desktop.png"), fullPage: true });
+
+  await panel.setViewportSize({ width: 390, height: 844 });
+  await panel.locator('[data-view="dashboard"]').click();
+  await visible(panel, ".metric");
+  await noOverflow(panel, "Central Nelvo móvel");
+  await panel.locator("#mobile-menu-toggle").click();
+  assert.equal(await panel.locator("#mobile-menu-toggle").getAttribute("aria-expanded"), "false");
+  await panel.screenshot({ path: path.join(output, "nelvo-dashboard-mobile.png"), fullPage: true });
+  await panel.locator("#mobile-menu-toggle").click();
+  await panel.locator('[data-view="funnel"]').click();
+  await visible(panel, ".application-card");
+  await noOverflow(panel, "Funil móvel");
+  await panel.locator("#mobile-menu-toggle").click();
+  await panel.screenshot({ path: path.join(output, "funil-mobile.png"), fullPage: true });
+  await panel.locator("#mobile-menu-toggle").click();
+  await applicant.setViewportSize({ width: 390, height: 844 });
+  await applicant.goto(base + "/aplicar");
+  await visible(applicant, "#apply-company");
+  await noOverflow(applicant, "Aplicação móvel");
+  await applicant.screenshot({ path: path.join(output, "aplicacao-mobile.png"), fullPage: true });
+  await applicant.close();
+  await panel.setViewportSize({ width: 1440, height: 1000 });
+  await panel.locator("#company-select").selectOption(fixtures.first.id);
+  await panel.locator('[data-view="inbox"]').click();
 
   // Cliente no widget: pergunta da base, pedido de humano e resposta do operador.
   const visitorContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -159,6 +262,8 @@ async function noOverflow(page, label) {
   await panel.locator("#logout").click();
   await visible(panel, "#login-screen");
   assert.equal(await panel.locator("#message-list").textContent(), "");
+  assert.equal(await panel.locator("#application-details").textContent(), "");
+  assert.equal(await panel.locator("#lead-phone").inputValue(), "");
   assert.equal(await panel.evaluate((key) => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(key), KEY), false);
   await panel.reload();
   await visible(panel, "#login-screen");
@@ -166,6 +271,7 @@ async function noOverflow(page, label) {
   await panel.screenshot({ path: path.join(output, "login-mobile.png"), fullPage: true });
   assert.deepEqual(errors, [], "Sem erros de JavaScript no painel ou widget");
   console.log("Painel verificado em desktop e celular: login, empresa, base, isolamento, chamado, resposta humana, retomada e chave apenas em memória.");
+  console.log("Nelvo verificada: aplicação pública, etapas do funil, cadastro do cliente, revisão, autorização, abordagem comercial e menu móvel.");
   console.log("Testes com empresas fictícias; nenhum envio real de WhatsApp ou consumo de IA.");
 })().catch(async (error) => {
   if (browser) {

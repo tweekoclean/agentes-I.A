@@ -5,7 +5,7 @@ import logging
 import secrets
 from typing import Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +25,7 @@ from .support_routes import support_routers
 from .database_ssl import DatabaseSSL
 from .models import Base, ConsentEvent, Lead, as_utc, build_database, utcnow
 from .panel_routes import panel_router
+from .funnel_routes import funnel_routers
 from .research import AnalysisError, analyze
 from .service import run_search, serialize_lead
 from .sources import DemoSource, OverpassSource, SourceBusy, SourceError, normalize_phone
@@ -133,7 +134,7 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
                 engine.dispose()
                 ssl_files.close()
 
-    app = FastAPI(title="AtendeAI — Pesquisa, Comercial e Atendimento", version="0.5.6", lifespan=lifespan,
+    app = FastAPI(title="Nelvo Company — Comercial e Atendimento", version="0.6.0", lifespan=lifespan,
                   description="Pesquisa em São Paulo, conversa comercial e suporte por empresa via site e WhatsApp oficial. O painel está em /painel. Use Authorize com ADMIN_API_KEY nas rotas administrativas; visitantes usam tokens próprios.")
     app.state.settings, app.state.engine, app.state.sessions = settings, engine, sessions
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
@@ -173,6 +174,9 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
     for router in support_routers(support, admin):
         app.include_router(router)
 
+    for router in funnel_routers(sessions, settings, support, admin):
+        app.include_router(router)
+
     def session_dependency():
         with sessions() as session:
             yield session
@@ -187,11 +191,16 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
         return lead
 
     @app.get("/", tags=["Informações"])
-    def index():
-        return {"projeto": "AtendeAI", "versao": "0.5.6", "documentacao": "/docs", "painel": "/painel",
+    def index(request: Request):
+        if "text/html" in request.headers.get("accept", ""):
+            from .panel_routes import application_page
+            response = application_page()
+            response.headers["Vary"] = "Accept"
+            return response
+        return JSONResponse({"projeto": "Nelvo Company", "versao": "0.6.0", "documentacao": "/docs", "painel": "/painel", "aplicacao": "/aplicar",
                 "agentes": {"1_pesquisa": "implementado", "2_comercial": "implementado" if settings.whatsapp_ready else "implementado_configuracao_pendente",
                             "3_atendimento": "implementado"},
-                "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}
+                "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}, headers={"Vary": "Accept", "Cache-Control": "no-store"})
 
     @app.get("/health", tags=["Informações"])
     def health():

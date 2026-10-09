@@ -14,7 +14,7 @@ from .whatsapp import WhatsAppClient, WhatsAppRejected, WhatsAppUncertain
 
 
 OPENING_TEMPLATE = (
-    "Olá, {{1}}! Aqui é da AtendeAI. Você autorizou nosso contato sobre atendimento "
+    "Olá, {{1}}! Aqui é da Nelvo Company. Você autorizou nosso contato sobre atendimento "
     "por IA para WhatsApp e sites. Posso te apresentar uma demonstração? "
     "Se preferir não receber mensagens, responda SAIR."
 )

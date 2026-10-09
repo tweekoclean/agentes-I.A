@@ -27,23 +27,30 @@ jobs:
                   try:
                       response = client.get(base + "/")
                       response.raise_for_status()
-                      if response.json().get("versao") == "0.5.6":
+                      if response.json().get("versao") == "0.6.0":
                           break
                   except (httpx.HTTPError, ValueError):
                       pass
                   if attempt == 17:
-                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.5.6.")
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.6.0.")
                   time.sleep(5)
               health = client.get(base + "/health")
               health.raise_for_status()
               assert health.json()["status"] == "ok"
-              print("Versão 0.5.6 publicada; banco conectado.")
-              for route in ("/painel", "/painel/painel.css", "/painel/painel.js"):
+              print("Versão 0.6.0 publicada; banco conectado.")
+              for route in ("/painel", "/painel/painel.css", "/painel/painel.js", "/aplicar", "/aplicar/formulario.js", "/marca.svg"):
                   panel = client.get(base + route)
                   panel.raise_for_status()
                   assert panel.headers.get("cache-control") == "no-store"
               private = client.get(base + "/v1/atendimento/empresas")
               assert private.status_code == 401
+              assert client.get(base + "/v1/funil").status_code == 401
+              landing = client.get(base + "/", headers={"Accept": "text/html"})
+              landing.raise_for_status()
+              assert "application-layout" in landing.text
+              catalog = client.get(base + "/publico/aplicacoes/catalogo")
+              catalog.raise_for_status()
+              assert "Campinas" in catalog.json()["cidades"]
               print("Painel e recursos publicados; dados administrativos continuam protegidos.")
               demo = client.get(base + "/demonstracao")
               assert demo.status_code in (302, 307)

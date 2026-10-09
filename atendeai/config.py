@@ -40,7 +40,7 @@ class Settings:
     whatsapp_app_secret: str = field(default="", repr=False)
     whatsapp_verify_token: str = field(default="", repr=False)
     whatsapp_api_version: str = "v24.0"
-    whatsapp_template_name: str = "atendeai_apresentacao"
+    whatsapp_template_name: str = "nelvo_apresentacao"
     whatsapp_template_language: str = "pt_BR"
     commercial_auto_reply: bool = True
     commercial_daily_limit: int = 100
@@ -82,7 +82,7 @@ class Settings:
             whatsapp_app_secret=os.getenv("WHATSAPP_APP_SECRET", ""),
             whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", ""),
             whatsapp_api_version=os.getenv("WHATSAPP_API_VERSION", "v24.0"),
-            whatsapp_template_name=os.getenv("WHATSAPP_TEMPLATE_NAME", "atendeai_apresentacao"),
+            whatsapp_template_name=os.getenv("WHATSAPP_TEMPLATE_NAME", "nelvo_apresentacao"),
             whatsapp_template_language=os.getenv("WHATSAPP_TEMPLATE_LANGUAGE", "pt_BR"),
             commercial_auto_reply=env_bool("COMMERCIAL_AUTO_REPLY", True),
             commercial_daily_limit=int(os.getenv("COMMERCIAL_DAILY_LIMIT", "100")),

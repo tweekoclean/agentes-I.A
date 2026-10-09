@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from atendeai.api import create_app
 from atendeai.config import Settings
-from atendeai.models import SupportKnowledge
+from atendeai.models import Lead, SalesApplication, SupportKnowledge
 from atendeai.support_routes import TenantCreate
 
 KEY = "browser-test-administrative-key-not-a-real-secret"
@@ -29,8 +29,17 @@ async def lifespan(application):
                 content="Atendemos de segunda a sexta, das 9h às 18h."))
             session.add(SupportKnowledge(tenant_id=second["id"], title="Resposta exclusiva da Aurora",
                 content="Esta informação pertence somente à Loja Aurora."))
+            lead = Lead(name="Restaurante Jardim · teste", city="Campinas", city_ibge="3509502", segment="restaurantes",
+                        phone_public="+5519912345678", phone_normalized="+5519912345678", source="teste_navegador",
+                        source_ref="restaurante-jardim", source_url="https://example.invalid", source_license="Fixture de teste", is_demo=False)
+            session.add(lead)
+            for name, stage, city in [("Café Alameda", "nova", "Campinas"), ("Loja Horizonte", "qualificacao", "São Paulo"),
+                                      ("Oficina Central", "demonstracao", "Sorocaba"), ("Studio Aurora", "proposta", "Ribeirão Preto")]:
+                session.add(SalesApplication(name=name + " · teste", stage=stage, city=city, segment="servicos",
+                                            source="aplicacao", contact_name="Responsável de teste", channels=["whatsapp"]))
             session.commit()
-        fixtures.update(first=first, second=second)
+            lead_id = lead.id
+        fixtures.update(first=first, second=second, lead_id=lead_id)
         yield
 
 

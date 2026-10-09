@@ -1,6 +1,6 @@
-# AtendeAI — pesquisa, comercial e atendimento, versão 0.5.6
+# Nelvo Company — central comercial e atendimento, versão 0.6.0
 
-Pesquisa e prospecção são ferramentas internas da AtendeAI; as empresas contratantes recebem o atendimento do sistema 3. Consulte [PRODUTO.md](PRODUTO.md) para o fluxo completo, confirmação de encaminhamento e mensagens ignoradas.
+**A Nelvo Company apresenta e vende o atendimento automático.** Os sistemas 1 (pesquisa) e 2 (abordagem comercial) são usados na operação interna; o sistema 3 é o serviço implantado nas empresas clientes. Consulte [PRODUTO.md](PRODUTO.md) para os fluxos do atendimento.
 
 Plataforma organizada em três módulos:
 
@@ -14,22 +14,33 @@ Os três agentes usam um modelo aberto hospedado por você, com instruções e p
 
 Abra [a demonstração do atendimento no site](https://atendeai-co.squareweb.app/demonstracao) para testar as respostas da base e o encaminhamento. O chat usa o modelo local quando a IA está habilitada para a empresa de demonstração; ele não conecta um número WhatsApp.
 
-## Painel de atendimento
+## Central da Nelvo e funil de aplicação
 
 Abra [o painel](https://atendeai-co.squareweb.app/painel) e entre com o valor de `ADMIN_API_KEY` cadastrado nas variáveis de ambiente da Square Cloud. A página não contém uma chave pronta; ela é informada pelo operador e mantida apenas na memória da aba. Sair, recarregar ou fechar a página exige entrar novamente. A chave não é gravada em cookies, localStorage, sessionStorage ou links.
 
-No painel, selecione a empresa e use:
+O painel abre na **Visão geral**, com números reais da operação. A navegação separa **Operação da Nelvo** de **Empresas clientes · Sistema 3**:
+
+- **Buscar empresas:** pesquisar por cidade, segmento e quantidade; consultar dados salvos, fonte, revisão e autorização de contato. Dados de demonstração aparecem identificados e não entram no funil real.
+- **Comercial WhatsApp:** criar e revisar abordagens com a marca Nelvo Company, aprovar/descartar, enfileirar quando a conta estiver configurada, acompanhar status de entrega e consultar/pausar conversas comerciais. Preparar um rascunho não envia mensagens.
+- **Funil de aplicação:** acompanhar Novas → Qualificação → Demonstração → Proposta → Contratadas, com arquivamento, busca, filtros, paginação e anotações. Empresas pesquisadas podem ser adicionadas ao funil.
+- **Aplicação pública:** [formulário em /aplicar](https://atendeai-co.squareweb.app/aplicar), em três etapas: empresa, atendimento e confirmação. O visitante informa canal, volume e necessidade, autoriza o contato e recebe um protocolo. A página inicial mostra o formulário em navegadores e mantém a resposta JSON para clientes da API.
+
+As aplicações persistem no PostgreSQL e só são listadas nas rotas administrativas `/v1/funil`. O formulário limita tamanho e frequência, rejeita campos inválidos e usa um identificador de envio para impedir duplicação em tentativas repetidas. Limites iniciais: cinco aplicações por telefone/conexão por hora e cem por dia na plataforma. A declaração de autorização é registrada na aplicação; antes de enviar uma abordagem, o operador confirma o contato e registra a evidência verificável na empresa comercial. O formulário não cria automaticamente um cliente nem envia mensagens.
+
+Após confirmar a contratação, salve a etapa **Contratada** e use **Cadastrar como cliente**. Cadastro e vínculo são gravados na mesma transação; repetir a ação recupera o mesmo cliente. Configure então o sistema 3 para aquela empresa. A Nelvo não precisa ser cadastrada como cliente para utilizar pesquisa ou abordagem comercial.
+
+Na área de empresas clientes, selecione a empresa e use:
 
 - **Atendimento:** consultar chamados abertos/resolvidos e conversas, ler o histórico, assumir o atendimento, responder ao cliente e concluir com retomada automática. A fila atualiza a cada 15 segundos, e o histórico aberto a cada 5 segundos enquanto a aba está visível.
 - **Base de respostas:** cadastrar, editar, ativar e desativar informações da empresa.
 - **Configuração:** ajustar boas-vindas, sites permitidos, limites diários e uso de IA; consultar o estado da integração WhatsApp e gerar o código do chat.
-- **Nova empresa:** criar um cadastro de atendimento separado, inicialmente com IA desabilitada. Guarde o código do chat exibido após o cadastro: a chave pública original não é recuperável. Substituí-la exige confirmação no painel e atualização dos sites incorporados.
+- **Cadastrar cliente:** criar um cadastro de atendimento separado, inicialmente com IA desabilitada. Guarde o código do chat exibido após o cadastro: a chave pública original não é recuperável. Substituí-la exige confirmação no painel e atualização dos sites incorporados.
 
 A chave é administrativa e concede acesso a todas as empresas. Este painel é para o dono/operador da plataforma; não oferece logins individuais de funcionários ou acesso restrito de cada cliente. Contas e permissões individuais serão necessários antes de distribuir o painel às empresas contratantes. Não coloque a chave administrativa no widget de visitantes.
 
 Responder mantém o bot pausado. **Concluir e retomar automático** resolve os chamados abertos daquela conversa e permite novas respostas automáticas. Para WhatsApp, o painel mostra fila/aceitação/entrega separadamente; o envio manual depende da conta habilitada e da janela de atendimento. Uma ação sem confirmação de rede não é repetida automaticamente.
 
-Os certificados, a conexão PostgreSQL e as credenciais dos provedores continuam exclusivamente nas variáveis de ambiente. Nenhuma tabela nova é necessária para o painel. Consulte [AGENTE-3.md](AGENTE-3.md) para o cadastro e a integração.
+Os certificados, a conexão PostgreSQL e as credenciais dos provedores continuam exclusivamente nas variáveis de ambiente. A versão 0.6 adiciona somente as tabelas `sales_applications` e `application_rates`, criadas na inicialização, sem alterar as tabelas ou registros existentes. Não execute o SQL de banco vazio sobre o banco em uso. Consulte [AGENTE-3.md](AGENTE-3.md) para a integração do serviço vendido.
 
 ## Pesquisa e cobertura
 

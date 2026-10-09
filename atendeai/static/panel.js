@@ -4,10 +4,12 @@
   const root = "/v1/atendimento/empresas";
   const pageSize = 50;
   const state = {
-    key: "", epoch: 0, pending: new Set(), companies: [], tenant: null, ai: null, view: "inbox",
+    key: "", epoch: 0, pending: new Set(), companies: [], tenant: null, ai: null, view: "dashboard",
     queuePage: 1, queueItems: [], queueFingerprint: "", knowledgePage: 1, knowledge: [],
     conversation: null, conversationId: "", historyPage: 1, historyFingerprint: "",
     editingKnowledge: "", siteKeys: new Map(), drafts: new Map(), polling: false, busy: false,
+    catalog: null, leadsPage: 1, funnelPage: 1, commercialPage: 1, salesPage: 1,
+    application: null, conversion: null, lead: null, sales: null, salesHistoryPage: 1,
   };
   let noticeTimer;
   const reasons = {
@@ -59,29 +61,33 @@
     state.conversationId = "";
     state.siteKeys.clear();
     state.drafts.clear();
+    state.application = state.conversion = state.lead = state.sales = null;
+    state.leadsPage = state.funnelPage = state.commercialPage = state.salesPage = 1;
+    $("funnel-filter").reset();
     $("admin-key").value = "";
     $("reply-text").value = "";
-    for (const id of ["company-select", "queue-list", "message-list", "knowledge-list"]) $(id).replaceChildren();
+    for (const id of ["company-select", "queue-list", "message-list", "knowledge-list", "lead-list", "funnel-board", "commercial-messages", "commercial-conversations", "dashboard-metrics", "dashboard-stages", "dashboard-checklist", "application-details", "lead-details", "sales-history", "commercial-status"]) $(id).replaceChildren();
     $("integration-code").textContent = "";
     $("integration-code").hidden = true;
     $("test-company").removeAttribute("href");
     $("settings-form").reset();
     for (const dialog of document.querySelectorAll("dialog")) {
       if (dialog.open) dialog.close();
-      dialog.querySelector("form")?.reset();
+      for (const form of dialog.querySelectorAll("form")) form.reset();
     }
+    for (const id of ["application-name", "application-origin", "lead-name", "sales-title", "sales-help", "conversation-title", "conversation-meta", "company-caption"]) $(id).textContent = "";
     $("app-screen").hidden = true;
     $("login-screen").hidden = false;
     $("notice").hidden = true;
     inlineError("login-error", message);
   }
-  async function api(path, { method = "GET", body } = {}) {
+  async function api(path, { method = "GET", body, timeoutMs = 15000 } = {}) {
     const controller = new AbortController();
     const epoch = state.epoch;
     const key = state.key;
     if (!key) throw new Error("Entre novamente no painel.");
     state.pending.add(controller);
-    const timeout = setTimeout(() => controller.abort("timeout"), 15000);
+    const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
     try {
       const response = await fetch(path, {
         method, signal: controller.signal, cache: "no-store", credentials: "omit",
@@ -160,14 +166,16 @@
   }
   function renderOverview() {
     const tenant = state.tenant;
-    $("no-company").hidden = !!tenant;
-    $("company-workspace").hidden = !tenant;
+    const internal = ["dashboard", "research", "funnel", "commercial"].includes(state.view);
+    $("nelvo-workspace").hidden = !internal;
+    $("no-company").hidden = internal || !!tenant;
+    $("company-workspace").hidden = internal || !tenant;
     $("company-select").disabled = !state.companies.length;
-    $("company-caption").textContent = tenant ? tenant.nome : "SEU ESPAÇO DE ATENDIMENTO";
+    $("company-caption").textContent = internal ? "NELVO COMPANY · OPERAÇÃO COMERCIAL" : (tenant ? "CLIENTE · " + tenant.nome : "ATENDIMENTO DAS EMPRESAS CLIENTES");
     if (!tenant) return;
     $("automation-status").textContent = !tenant.ativa ? "Empresa desativada" :
       (tenant.ia_habilitada ? (state.ai?.pronta ? "IA local ativa" : "IA local aguardando configuração") : "Respostas cadastradas");
-    $("whatsapp-status").textContent = tenant.whatsapp_ativo ? "Conectado" : "Aguardando configuração";
+    $("whatsapp-status").textContent = tenant.whatsapp_ativo ? "Configurado" : "Aguardando configuração";
     $("conversation-limit").textContent = tenant.limite_conversas_dia.toLocaleString("pt-BR");
   }
   async function selectCompany(id) {
@@ -189,21 +197,26 @@
     $("knowledge-list").replaceChildren();
     inlineError("load-error");
     renderOverview();
-    await showView(state.view, false);
+    await showView(["dashboard", "research", "funnel", "commercial"].includes(state.view) ? "inbox" : state.view, false);
   }
   async function showView(view, cancel = true) {
     if (cancel) invalidate();
     state.view = view;
-    $("view-title").textContent = { inbox: "Atendimento", knowledge: "Base de respostas", settings: "Configuração" }[view];
+    $("view-title").textContent = { dashboard: "Visão geral", research: "Buscar empresas", funnel: "Funil de aplicação", commercial: "Comercial WhatsApp", inbox: "Atendimentos dos clientes", knowledge: "Base de respostas", settings: "Configuração do cliente" }[view];
     for (const element of document.querySelectorAll(".nav-button")) {
       const active = element.dataset.view === view;
       element.classList.toggle("active", active);
       if (active) element.setAttribute("aria-current", "page"); else element.removeAttribute("aria-current");
     }
-    for (const name of ["inbox", "knowledge", "settings"]) $("view-" + name).hidden = name !== view;
+    for (const name of ["dashboard", "research", "funnel", "commercial", "inbox", "knowledge", "settings"]) $("view-" + name).hidden = name !== view;
+    renderOverview();
     inlineError("load-error");
-    if (!state.tenant) return;
     try {
+      if (view === "dashboard") { await loadDashboard(); return; }
+      if (view === "research") { await loadCatalog(); await loadLeads(); return; }
+      if (view === "funnel") { await loadFunnel(); return; }
+      if (view === "commercial") { await loadCommercial(); return; }
+      if (!state.tenant) return;
       if (view === "inbox") await Promise.all([loadQueue(), state.conversationId ? loadConversation() : Promise.resolve()]);
       else if (view === "knowledge") await loadKnowledge();
       else renderSettings();
@@ -388,8 +401,10 @@
     else $("test-company").removeAttribute("href");
   }
   const parseOrigins = (text) => [...new Set(text.split(/[\n,]+/).map((value) => value.trim()).filter(Boolean))];
-  function openCompany() {
+  function openCompany(application = null) {
+    state.conversion = application;
     $("company-form").reset();
+    if (application) $("new-name").value = application.nome_empresa;
     inlineError("company-form-error");
     $("company-dialog").showModal();
   }
@@ -403,26 +418,34 @@
       await loadCompanies();
       $("login-screen").hidden = true;
       $("app-screen").hidden = false;
-      state.view = "inbox";
-      await selectCompany(state.companies.find((company) => company.id === "00000000-0000-4000-a000-000000000003")?.id || state.companies[0]?.id);
+      state.tenant = state.companies.find((company) => company.id === "00000000-0000-4000-a000-000000000003") || state.companies[0] || null;
+      $("company-select").value = state.tenant?.id || "";
+      await showView("dashboard", false);
     });
   });
   $("logout").addEventListener("click", () => { endSession(); $("admin-key").focus(); });
+  $("mobile-menu-toggle").addEventListener("click", () => {
+    const closed = document.querySelector(".sidebar").classList.toggle("menu-closed");
+    $("mobile-menu-toggle").setAttribute("aria-expanded", String(!closed));
+    $("mobile-menu-toggle").setAttribute("aria-label", closed ? "Expandir menu" : "Recolher menu");
+  });
   $("company-select").addEventListener("change", guarded((event) => selectCompany(event.target.value)));
   for (const button of document.querySelectorAll(".nav-button")) button.addEventListener("click", guarded(() => showView(button.dataset.view)));
   $("refresh").addEventListener("click", guarded(async () => {
     await loadCompanies(); renderOverview(); await showView(state.view);
   }));
-  $("create-company").addEventListener("click", openCompany);
-  $("create-first-company").addEventListener("click", openCompany);
+  $("create-company").addEventListener("click", () => openCompany());
+  $("create-first-company").addEventListener("click", () => openCompany());
   for (const button of document.querySelectorAll(".close-dialog")) button.addEventListener("click", () => button.closest("dialog").close());
   $("company-form").addEventListener("submit", (event) => {
     event.preventDefault();
     formAction(event.currentTarget, "company-form-error", async () => {
       const origins = parseOrigins($("new-origins").value);
       if ($("new-allow-test").checked && !origins.includes(window.location.origin)) origins.push(window.location.origin);
-      const company = await api(root, { method: "POST", body: { nome: $("new-name").value.trim(), origens_permitidas: origins, boas_vindas: $("new-welcome").value.trim() } });
-      state.siteKeys.set(company.id, company.chave_site);
+      const result = await api(state.conversion ? "/v1/funil/" + state.conversion.id + "/cliente" : root, { method: "POST", body: { nome: $("new-name").value.trim(), origens_permitidas: origins, boas_vindas: $("new-welcome").value.trim() } });
+      const company = result.empresa || result;
+      if (company.chave_site) state.siteKeys.set(company.id, company.chave_site);
+      state.conversion = null;
       $("company-dialog").close();
       await loadCompanies();
       state.view = "settings";
@@ -499,6 +522,222 @@
       notice("Nova chave gerada. Atualize o código incorporado nos sites da empresa.");
     } finally { button.disabled = false; }
   }));
+  const stages = { nova: "Novas", qualificacao: "Qualificação", demonstracao: "Demonstração", proposta: "Proposta", ganha: "Contratadas", perdida: "Arquivadas" };
+  const volumes = { ate_30: "Até 30 conversas/dia", "31_100": "31 a 100 conversas/dia", "101_300": "101 a 300 conversas/dia", mais_300: "Mais de 300 conversas/dia", nao_sei: "Ainda não sabe", nao_informado: "Não informado" };
+  const messageStatus = { rascunho: "Rascunho", aprovada: "Aprovada", descartada: "Descartada", na_fila: "Na fila", processando: "Processando", aceita: "Aceita pela Meta", envio_incerto: "Envio sem confirmação", falhou: "Falha", bloqueada: "Bloqueada", cancelada: "Cancelada", recebida: "Recebida", processada: "Processada" };
+  function action(text, work, className = "secondary") {
+    const button = node("button", "button " + className, text);
+    button.type = "button";
+    button.addEventListener("click", guarded(async () => {
+      button.disabled = true;
+      try { await work(); } finally { button.disabled = false; }
+    }));
+    return button;
+  }
+  function details(container, entries) {
+    container.replaceChildren(...entries.map(([label, value]) => {
+      const item = node("div", "detail-item");
+      item.append(node("span", "", label), node("p", "", value || "Não informado"));
+      return item;
+    }));
+  }
+  function pager(prefix, page, count, total = null) {
+    $(prefix + "-prev").disabled = page === 1;
+    $(prefix + "-next").disabled = total === null ? count < pageSize : page * pageSize >= total;
+    $(prefix + "-page").textContent = "Página " + page + (total === null ? "" : " · " + total + " registros");
+  }
+  async function loadDashboard() {
+    const [summary, commercial] = await Promise.all([api("/v1/funil/resumo"), api("/v1/comercial/status")]);
+    const open = summary.etapas.filter((stage) => !["ganha", "perdida"].includes(stage.id)).reduce((sum, item) => sum + item.quantidade, 0);
+    $("dashboard-metrics").replaceChildren(...[
+      ["EMPRESAS ENCONTRADAS", summary.empresas_encontradas, "Empresas reais salvas pela pesquisa"],
+      ["OPORTUNIDADES ATIVAS", open, "Aplicações em acompanhamento"],
+      ["EMPRESAS CLIENTES", summary.clientes, "Espaços de atendimento cadastrados"],
+      ["ABORDAGENS NA FILA", commercial.mensagens_na_fila, "Mensagens aguardando processamento"],
+    ].map(([label, value, caption]) => {
+      const card = node("article", "card metric");
+      card.append(node("small", "", label), node("strong", "", value.toLocaleString("pt-BR")), node("p", "", caption));
+      return card;
+    }));
+    const max = Math.max(1, ...summary.etapas.map((stage) => stage.quantidade));
+    $("dashboard-stages").replaceChildren(...summary.etapas.map((stage) => {
+      const row = node("div", "stage-row");
+      const progress = node("progress");
+      progress.max = max; progress.value = stage.quantidade;
+      progress.setAttribute("aria-label", stage.nome + ": " + stage.quantidade);
+      row.append(node("span", "", stage.nome), progress, node("strong", "", stage.quantidade));
+      return row;
+    }));
+    $("dashboard-checklist").replaceChildren(...[
+      [true, "Pesquisa e aplicações", "Busque empresas ou compartilhe o formulário público."],
+      [commercial.envio_ativo, "WhatsApp comercial da Nelvo", commercial.envio_ativo ? "Envio habilitado. A entrega depende da Meta e da autorização da empresa." : "Aguardando número e configuração da conta comercial da Nelvo."],
+      [Boolean(state.ai?.pronta), "IA de atendimento dos clientes", state.ai?.pronta ? "Modelo local pronto. Ative por empresa após cadastrar suas informações." : "Confira a inicialização do modelo nas configurações dos clientes."],
+    ].map(([ready, title, text]) => {
+      const row = node("div", "check-item"); const copy = node("div");
+      copy.append(node("strong", "", title), node("p", "", text));
+      row.append(node("span", "badge " + (ready ? "green" : "amber"), ready ? "✓" : "○"), copy); return row;
+    }));
+  }
+  async function loadCatalog() {
+    if (state.catalog) return;
+    state.catalog = await api("/publico/aplicacoes/catalogo");
+    $("search-city").replaceChildren(...state.catalog.cidades.map((city) => { const option = node("option", "", city); option.value = city; return option; }));
+    $("search-city").value = "Campinas";
+    $("search-segment").replaceChildren(...state.catalog.segmentos.map((segment) => { const option = node("option", "", segment.nome); option.value = segment.id; return option; }));
+  }
+  async function loadLeads() {
+    const params = new URLSearchParams({ cidade: $("search-city").value, segmento: $("search-segment").value, limite: pageSize, pagina: state.leadsPage });
+    const data = await api("/v1/empresas?" + params);
+    pager("leads", state.leadsPage, data.empresas.length, data.total);
+    if (!data.empresas.length) { empty($("lead-list"), "Nenhuma empresa encontrada ainda.", "Pesquise uma cidade e segmento para preencher sua lista."); return; }
+    $("lead-list").replaceChildren(...data.empresas.map((lead) => {
+      const row = node("article", "card lead-row"); const info = node("div", "lead-info");
+      info.append(node("h3", "", lead.nome), node("p", "", lead.cidade + " · " + (state.catalog?.segmentos.find((s) => s.id === lead.segmento)?.nome || lead.segmento)), node("p", "", lead.telefone_publicado || "Telefone não publicado"));
+      const buttons = node("div", "lead-actions");
+      buttons.append(node("span", "badge " + (lead.demonstracao ? "amber" : "blue"), lead.demonstracao ? "Demonstração" : (lead.elegivel_para_etapa_comercial ? "Pronta para abordagem" : "Revisar contato")), action("Abrir empresa →", () => openLead(lead.id)));
+      row.append(info, buttons); return row;
+    }));
+    $("search-source").textContent = data.empresas.some((lead) => lead.demonstracao) ? "Fonte de demonstração: empresas fictícias, sem envio real. Para pesquisar empresas reais, configure SEARCH_PROVIDER=overpass." : "Dados de fontes públicas. OpenStreetMap © colaboradores · ODbL. Verifique os contatos antes da abordagem.";
+  }
+  async function openLead(id, { refresh = false, preserveContact = false } = {}) {
+    const lead = await api("/v1/empresas/" + encodeURIComponent(id));
+    if (refresh && (!$("lead-dialog").open || state.lead?.id !== id)) return;
+    const contactDraft = preserveContact ? { phone: $("lead-phone").value, evidence: $("lead-evidence").value, status: $("lead-consent-status").value } : null;
+    state.lead = lead;
+    $("lead-name").textContent = lead.nome;
+    details($("lead-details"), [["Cidade / segmento", lead.cidade + " · " + lead.segmento], ["Endereço", lead.endereco_publicado], ["Contato publicado", lead.telefone_publicado], ["Site", lead.site], ["Origem", lead.demonstracao ? "Demonstração fictícia" : lead.fonte], ["Autorização WhatsApp", lead.consentimento_whatsapp]]);
+    if (lead.url_fonte && /^https:\/\//.test(lead.url_fonte)) {
+      const link = node("a", "", "Consultar fonte ↗"); link.href = lead.url_fonte; link.target = "_blank"; link.rel = "noopener noreferrer"; $("lead-details").append(link);
+    }
+    $("lead-review").value = lead.revisao; $("lead-note").value = lead.nota_revisao || "";
+    $("lead-phone").value = contactDraft?.phone || lead.destinatario_whatsapp_autorizado || lead.telefone_normalizado || "";
+    $("lead-evidence").value = contactDraft?.evidence || "";
+    if (contactDraft) $("lead-consent-status").value = contactDraft.status;
+    $("lead-add-funnel").disabled = lead.demonstracao; $("lead-draft").disabled = lead.demonstracao;
+    $("lead-consent-form").hidden = lead.demonstracao;
+    inlineError("lead-action-error");
+    if (!$("lead-dialog").open) $("lead-dialog").showModal();
+  }
+  async function loadFunnel() {
+    const params = new URLSearchParams({ limite: pageSize, pagina: state.funnelPage, busca: $("funnel-search").value.trim() });
+    if ($("funnel-stage").value) params.set("etapa", $("funnel-stage").value);
+    const data = await api("/v1/funil?" + params);
+    $("funnel-total").textContent = data.total + " oportunidades nesta seleção · clique em uma empresa para atualizar a etapa e o próximo passo.";
+    pager("funnel", state.funnelPage, data.aplicacoes.length, data.total);
+    $("funnel-board").replaceChildren(...Object.entries(stages).filter(([id]) => !$("funnel-stage").value || $("funnel-stage").value === id).map(([id, title]) => {
+      const column = node("section", "funnel-column"); column.dataset.stage = id;
+      const entries = data.aplicacoes.filter((item) => item.etapa === id);
+      const header = node("header"); header.append(node("h2", "", title), node("span", "count", entries.length)); column.append(header);
+      for (const item of entries) {
+        const card = node("button", "application-card"); card.type = "button";
+        card.append(node("span", "badge " + (item.origem === "aplicacao" ? "blue" : "gray"), item.origem === "aplicacao" ? "Aplicação recebida" : "Pesquisa"), node("h3", "", item.nome_empresa), node("p", "", item.cidade + " · " + item.segmento), node("p", "", item.nome_contato || "Contato a confirmar"), node("small", "", "Atualizada " + date(item.atualizada_em)));
+        card.addEventListener("click", () => openApplication(item)); column.append(card);
+      }
+      if (!entries.length) column.append(node("p", "column-empty", "Nenhuma oportunidade nesta página"));
+      return column;
+    }));
+  }
+  function openApplication(item) {
+    state.application = item;
+    $("application-name").textContent = item.nome_empresa; $("application-origin").textContent = item.origem === "aplicacao" ? "APLICAÇÃO PÚBLICA" : "EMPRESA DA PESQUISA";
+    details($("application-details"), [["Cidade / segmento", item.cidade + " · " + item.segmento], ["Responsável", item.nome_contato], ["WhatsApp", item.whatsapp], ["Canais", item.canais.map(channelName).join(" e ")], ["Volume", volumes[item.volume]], ["Necessidade", item.objetivo], ["Autorização declarada no formulário", item.autoriza_contato ? "Autorizou contato sobre o serviço. Verifique o responsável antes de registrar a autorização de envio comercial." : "Não registrada"]]);
+    const contact = action("Revisar contato e preparar abordagem", async () => {
+      const result = await api("/v1/funil/" + item.id + "/empresa", { method: "POST" });
+      $("funnel-dialog").close(); await openLead(result.empresa_id);
+    });
+    $("application-details").append(contact);
+    $("application-stage").value = item.etapa; $("application-notes").value = item.notas;
+    $("application-stage").disabled = Boolean(item.cliente_id);
+    $("application-convert").textContent = item.cliente_id ? "Abrir cliente" : "Cadastrar como cliente";
+    $("application-convert").disabled = !item.cliente_id && item.etapa !== "ganha";
+    $("application-convert-help").textContent = item.cliente_id ? "O espaço deste cliente já foi criado." : "Salve a etapa Contratada para habilitar o cadastro do serviço. A conexão com WhatsApp é configurada depois.";
+    inlineError("application-error"); if (!$("funnel-dialog").open) $("funnel-dialog").showModal();
+  }
+  async function loadCommercial() {
+    const [status, data, conversations] = await Promise.all([
+      api("/v1/comercial/status"), api("/v1/comercial/mensagens?" + new URLSearchParams({ limite: pageSize, pagina: state.commercialPage, ...($("commercial-filter").value ? { status: $("commercial-filter").value } : {}) })),
+      api("/v1/comercial/conversas?limite=" + pageSize + "&pagina=" + state.salesPage),
+    ]);
+    const heading = node("div", "status-heading"); heading.append(node("span", "badge " + (status.envio_ativo ? "green" : "amber"), status.envio_ativo ? "Habilitado" : "Configuração pendente"), node("h2", "", "WhatsApp comercial da Nelvo"));
+    $("commercial-status").replaceChildren(heading, node("p", "", status.envio_ativo ? "Envio habilitado · " + status.abordagens_tentadas_hoje + " tentativas hoje de " + status.limite_diario_abordagens + ". Mensagens iniciais exigem autorização, revisão e template aprovado na Meta." : "Você já pode preparar e revisar abordagens. O envio será liberado após cadastrar o número e configurar a conta da Nelvo na Meta."));
+    if (status.variaveis_pendentes.length) $("commercial-status").append(node("p", "field-help", "Configuração na hospedagem: " + status.variaveis_pendentes.join(", ")));
+    pager("commercial", state.commercialPage, data.mensagens.length);
+    if (!data.mensagens.length) empty($("commercial-messages"), "Nenhuma abordagem nesta seleção.", "Abra uma empresa na pesquisa ou no funil para criar o rascunho comercial.");
+    else $("commercial-messages").replaceChildren(...data.mensagens.map((message) => {
+      const card = node("article", "card commercial-card"); const header = node("div", "card-heading");
+      header.append(node("h3", "", message.destinatario || "Destinatário a confirmar"), node("span", "badge " + (message.status === "rascunho" ? "amber" : "blue"), messageStatus[message.status] || message.status));
+      card.append(header, node("p", "", message.texto), node("small", "muted", date(message.criada_em)));
+      if (message.entrega) card.append(node("p", "message-status", "Entrega: " + ({ delivered: "entregue", read: "lida", failed: "falhou", sent: "enviada" }[message.entrega] || message.entrega)));
+      if (message.erro) card.append(node("p", "message-status", message.erro));
+      const buttons = node("div", "actions");
+      const mutate = async (endpoint, body) => { await api("/v1/comercial/mensagens/" + message.id + endpoint, { method: "POST", ...(body ? { body } : {}) }); await loadCommercial(); };
+      if (["rascunho", "aprovada"].includes(message.status)) {
+        if (message.status === "rascunho") buttons.append(action("Aprovar rascunho", () => mutate("/revisao", { aprovar: true }), "primary"));
+        buttons.append(action("Descartar", () => mutate("/revisao", { aprovar: false })));
+      }
+      if (message.status === "aprovada") { const send = action("Enfileirar envio", () => mutate("/enfileirar"), "primary"); send.disabled = !status.envio_ativo; buttons.append(send); }
+      if (message.status === "na_fila") buttons.append(action("Cancelar envio", () => mutate("/cancelar")));
+      if (message.empresa_id) buttons.append(action("Ver empresa", () => openLead(message.empresa_id), "quiet"));
+      card.append(buttons); return card;
+    }));
+    pager("sales", state.salesPage, conversations.conversas.length);
+    if (!conversations.conversas.length) empty($("commercial-conversations"), "As conversas comerciais aparecerão aqui.", "Acompanhe as respostas das empresas ao WhatsApp da Nelvo.");
+    else $("commercial-conversations").replaceChildren(...conversations.conversas.map((item) => {
+      const row = node("article", "card lead-row"); const copy = node("div", "lead-info");
+      copy.append(node("h3", "", item.destinatario), node("p", "", item.contato_interrompido ? "Empresa pediu para interromper o contato" : (item.ia_pausada ? "Aguardando responsável" : "Respostas automáticas habilitadas")));
+      row.append(copy, action("Abrir conversa →", async () => { state.sales = item; state.salesHistoryPage = 1; await loadSalesHistory(); $("sales-dialog").showModal(); })); return row;
+    }));
+  }
+  async function loadSalesHistory() {
+    const data = await api("/v1/comercial/conversas/" + state.sales.id + "?limite=50&pagina=" + state.salesHistoryPage);
+    state.sales = data.conversa;
+    $("sales-title").textContent = data.conversa.destinatario;
+    $("sales-history").replaceChildren(...data.mensagens.map((message) => {
+      const item = node("article", message.direcao === "saida" ? "outbound" : ""); item.append(node("small", "", (message.direcao === "saida" ? "Nelvo" : "Empresa") + " · " + date(message.criada_em)), node("span", "", message.texto)); return item;
+    }));
+    $("sales-history-prev").disabled = data.mensagens.length < 50; $("sales-history-next").disabled = state.salesHistoryPage === 1;
+    $("sales-history-page").textContent = "Página " + state.salesHistoryPage;
+    $("sales-help").textContent = data.conversa.contato_interrompido ? "Contato interrompido pela empresa." : (data.conversa.ia_pausada ? "Respostas automáticas pausadas. " + (data.conversa.motivo_pausa || "") : "O agente comercial conversa sobre a oferta da Nelvo.");
+    $("sales-pause").disabled = data.conversa.contato_interrompido;
+    $("sales-pause").textContent = data.conversa.ia_pausada ? "Retomar respostas automáticas" : "Pausar respostas automáticas";
+  }
+  for (const button of document.querySelectorAll("[data-open]")) button.addEventListener("click", guarded(() => showView(button.dataset.open)));
+  $("copy-application").addEventListener("click", guarded(async () => { const url = location.origin + "/aplicar"; if (navigator.clipboard) { await navigator.clipboard.writeText(url); notice("Link do formulário copiado."); } else notice("Link da aplicação: " + url); }));
+  $("search-form").addEventListener("submit", (event) => {
+    event.preventDefault(); formAction(event.currentTarget, "search-error", async () => {
+      $("search-submit").textContent = "Pesquisando…";
+      try { await api("/v1/buscas", { method: "POST", timeoutMs: 65000, body: { cidade: $("search-city").value, segmentos: [$("search-segment").value], limite: Number($("search-limit").value), usar_cache: true } }); state.leadsPage = 1; await loadLeads(); notice("Pesquisa concluída. Abra uma empresa para revisar o contato."); }
+      finally { $("search-submit").textContent = "Buscar empresas →"; }
+    });
+  });
+  $("load-leads").addEventListener("click", guarded(async () => { state.leadsPage = 1; await loadLeads(); }));
+  $("funnel-filter").addEventListener("submit", (event) => { event.preventDefault(); guarded(async () => { state.funnelPage = 1; await loadFunnel(); })(); });
+  $("commercial-filter").addEventListener("change", guarded(async () => { state.commercialPage = 1; await loadCommercial(); }));
+  for (const [prefix, field, work] of [["leads", "leadsPage", loadLeads], ["funnel", "funnelPage", loadFunnel], ["commercial", "commercialPage", loadCommercial], ["sales", "salesPage", loadCommercial]]) {
+    for (const [suffix, delta] of [["prev", -1], ["next", 1]]) $(prefix + "-" + suffix).addEventListener("click", guarded(async () => { state[field] = Math.max(1, state[field] + delta); await work(); }));
+  }
+  $("funnel-detail-form").addEventListener("submit", (event) => { event.preventDefault(); formAction(event.currentTarget, "application-error", async () => {
+    const item = await api("/v1/funil/" + state.application.id, { method: "PATCH", body: { etapa: $("application-stage").value, notas: $("application-notes").value } });
+    state.application = item;
+    await loadFunnel();
+    if ($("funnel-dialog").open) openApplication(item);
+    notice("Aplicação atualizada.");
+  }); });
+  $("application-convert").addEventListener("click", guarded(async () => {
+    const item = state.application; $("funnel-dialog").close();
+    if (item.cliente_id) { await loadCompanies(); state.view = "settings"; await selectCompany(item.cliente_id); }
+    else openCompany(item);
+  }));
+  $("lead-review-form").addEventListener("submit", (event) => { event.preventDefault(); formAction(event.currentTarget, "lead-action-error", async () => {
+    const id = state.lead.id; await api("/v1/empresas/" + id + "/revisao", { method: "POST", body: { status: $("lead-review").value, observacao: $("lead-note").value } }); await openLead(id, { refresh: true, preserveContact: true }); notice("Revisão salva.");
+  }); });
+  $("lead-consent-form").addEventListener("submit", (event) => { event.preventDefault(); formAction(event.currentTarget, "lead-action-error", async () => {
+    const id = state.lead.id; await api("/v1/empresas/" + id + "/consentimento", { method: "POST", body: { status: $("lead-consent-status").value, destinatario_whatsapp: $("lead-phone").value, evidencia: $("lead-evidence").value } }); await openLead(id, { refresh: true }); notice("Autorização registrada.");
+  }); });
+  $("lead-add-funnel").addEventListener("click", guarded(async () => { await api("/v1/funil/empresas", { method: "POST", body: { empresa_id: state.lead.id } }); $("lead-dialog").close(); await showView("funnel"); notice("Empresa adicionada ao funil."); }));
+  $("lead-draft").addEventListener("click", guarded(async () => { await api("/v1/comercial/rascunhos", { method: "POST", body: { empresa_id: state.lead.id } }); $("lead-dialog").close(); await showView("commercial"); notice("Abordagem criada. Revise antes de enviar."); }));
+  $("sales-pause").addEventListener("click", guarded(async () => { await api("/v1/comercial/conversas/" + state.sales.id + "/pausa", { method: "POST", body: { pausado: !state.sales.ia_pausada } }); await loadSalesHistory(); }));
+  for (const [id, delta] of [["sales-history-prev", 1], ["sales-history-next", -1]]) $(id).addEventListener("click", guarded(async () => { state.salesHistoryPage = Math.max(1, state.salesHistoryPage + delta); await loadSalesHistory(); }));
   let pollCount = 0;
   setInterval(async () => {
     if (!state.key || !state.tenant || state.view !== "inbox" || state.polling || state.busy || document.hidden) return;

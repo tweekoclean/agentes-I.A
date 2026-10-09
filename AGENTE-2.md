@@ -1,6 +1,6 @@
 # Agente 2 — WhatsApp comercial
 
-Esta etapa apresenta a proposta da AtendeAI aos contatos autorizados, registra respostas e encaminha interessados ao responsável. O número conectado aqui é o número comercial da AtendeAI. Para conectar números e sites de empresas contratantes, use [AGENTE-3.md](AGENTE-3.md).
+Esta etapa apresenta a proposta da Nelvo Company aos contatos autorizados, registra respostas e encaminha interessados ao responsável. O número conectado aqui é o número comercial da Nelvo. O serviço oferecido é o sistema 3, de atendimento automático. Para conectar números e sites de empresas contratantes, use [AGENTE-3.md](AGENTE-3.md).
 
 ## Conferir a implantação
 
@@ -21,7 +21,7 @@ Cadastre estas variáveis na Square Cloud. Mantenha as variáveis atuais de Post
 | `WHATSAPP_APP_SECRET` | Segredo do aplicativo Meta, usado para validar os eventos recebidos |
 | `WHATSAPP_VERIFY_TOKEN` | Valor secreto escolhido por você; repita o mesmo valor no cadastro do webhook |
 | `WHATSAPP_API_VERSION` | Versão Graph compatível com seu aplicativo; padrão configurável `v24.0` |
-| `WHATSAPP_TEMPLATE_NAME` | Nome do template aprovado; padrão `atendeai_apresentacao` |
+| `WHATSAPP_TEMPLATE_NAME` | Nome do template aprovado; padrão `nelvo_apresentacao` |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Idioma do template, inicialmente `pt_BR` |
 | `WHATSAPP_ENABLED` | `true` para ativar depois de conferir as credenciais e o template; padrão `false` |
 | `COMMERCIAL_AUTO_REPLY` | `true` para respostas automáticas; `false` para registrar as entradas e abrir chamados sem responder |
@@ -42,10 +42,10 @@ Use o mesmo `WHATSAPP_VERIFY_TOKEN`, assine o campo de eventos `messages` e vinc
 
 ## Cadastrar o template de apresentação
 
-Crie um template de marketing, idioma português do Brasil, com nome `atendeai_apresentacao` ou o nome que você configurou. Esta versão espera **somente o corpo com um parâmetro de texto**, sem cabeçalho ou botões obrigatórios:
+Crie um template de marketing, idioma português do Brasil, com nome `nelvo_apresentacao` ou o nome que você configurou. Se já existia um template da marca anterior, crie/aprove o texto da Nelvo na Meta e ajuste a variável; mudar o texto no painel não altera um template da Meta. Esta versão espera **somente o corpo com um parâmetro de texto**, sem cabeçalho ou botões obrigatórios:
 
 ```text
-Olá, {{1}}! Aqui é da AtendeAI. Você autorizou nosso contato sobre atendimento por IA para WhatsApp e sites. Posso te apresentar uma demonstração? Se preferir não receber mensagens, responda SAIR.
+Olá, {{1}}! Aqui é da Nelvo Company. Você autorizou nosso contato sobre atendimento por IA para WhatsApp e sites. Posso te apresentar uma demonstração? Se preferir não receber mensagens, responda SAIR.
 ```
 
 O parâmetro `{{1}}` recebe o nome da empresa. Use um nome fictício como exemplo na configuração da Meta. Aguarde a aprovação do template. Mantenha o texto cadastrado igual ao texto de apresentação deste projeto, para que a prévia e a mensagem enviada correspondam. A API envia o nome do template e o parâmetro; quem guarda o texto do template é a Meta.

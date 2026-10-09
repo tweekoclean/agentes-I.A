@@ -1,12 +1,12 @@
-# Os três sistemas da AtendeAI
+# Operação da Nelvo Company e serviço de atendimento
 
 | Sistema | Quem usa | Função |
 | --- | --- | --- |
-| 1 — Pesquisa | AtendeAI | Encontrar empresas em São Paulo e interior, guardar contatos públicos e preparar oportunidades comerciais. |
-| 2 — Comercial | AtendeAI | Apresentar e oferecer o sistema 3 pelo número comercial da AtendeAI e conversar com os contatos aptos à abordagem. |
+| 1 — Pesquisa | Operação interna da Nelvo | Encontrar empresas em São Paulo e interior, guardar contatos públicos e preparar oportunidades comerciais. |
+| 2 — Comercial | Nelvo Company | Apresentar e oferecer o sistema 3 pelo número comercial da Nelvo e conversar com os contatos aptos à abordagem. |
 | 3 — Atendimento | Empresas contratantes | Atender os clientes da própria empresa pelo site/API e WhatsApp, com fatos e histórico separados por empresa. |
 
-A pesquisa não instala o atendimento no negócio encontrado. Os sistemas 1 e 2 são ferramentas internas da AtendeAI. A integração distribuída ao cliente é o sistema 3; o cliente não recebe a chave administrativa que acessa pesquisa, prospecção ou outras empresas.
+A Nelvo apresenta e vende o serviço. A pesquisa e a abordagem são ferramentas internas; a integração distribuída à empresa contratante é somente o sistema 3. A Nelvo não precisa ser cadastrada como uma empresa cliente para fazer prospecção. O cliente não recebe a chave administrativa que acessa pesquisa, prospecção ou outras empresas.
 
 O sistema 2 envia pela fila após configuração do WhatsApp comercial, aprovação e autorização do contato. Encontrar um telefone público não libera automaticamente o envio. Os trabalhadores processam os envios e as respostas; as permissões existentes continuam sendo verificadas. A operação exige conectar a conta oficial. Um cadastro de oportunidade comercial e um cadastro de cliente de atendimento são entidades separadas.
 

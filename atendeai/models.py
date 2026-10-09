@@ -22,6 +22,36 @@ class Base(DeclarativeBase):
     pass
 
 
+class SalesApplication(Base):
+    """Operação comercial da Nelvo, separada dos espaços de atendimento vendidos."""
+    __tablename__ = "sales_applications"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    submission_id: Mapped[str | None] = mapped_column(String(36), unique=True)
+    lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id"), unique=True)
+    tenant_id: Mapped[str | None] = mapped_column(ForeignKey("support_tenants.id"), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+    city: Mapped[str] = mapped_column(String(100))
+    segment: Mapped[str] = mapped_column(String(50))
+    contact_name: Mapped[str] = mapped_column(String(150), default="")
+    phone: Mapped[str | None] = mapped_column(String(20))
+    channels: Mapped[list] = mapped_column(JSON, default=list)
+    volume: Mapped[str] = mapped_column(String(30), default="nao_informado")
+    goals: Mapped[str] = mapped_column(Text, default="")
+    contact_permission: Mapped[bool] = mapped_column(Boolean, default=False)
+    source: Mapped[str] = mapped_column(String(30), default="pesquisa")
+    stage: Mapped[str] = mapped_column(String(30), default="nova", index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ApplicationRate(Base):
+    __tablename__ = "application_rates"
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class Lead(Base):
     __tablename__ = "leads"
     __table_args__ = (UniqueConstraint("source", "source_ref", name="uq_lead_source"),)

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>Painel · AtendeAI</title>
+  <title>Central Nelvo · Comercial e clientes</title>
   <link rel="stylesheet" href="/painel/painel.css">
   <script src="/painel/painel.js" defer></script>
 </head>
@@ -12,17 +12,17 @@
   <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
   <main id="login-screen" class="login-screen">
     <section class="login-story">
-      <a class="brand" href="/painel"><span class="brand-mark" aria-hidden="true">a</span>AtendeAI</a>
-      <div class="story-copy"><span class="eyebrow">ATENDIMENTO, EM UM SÓ LUGAR</span>
-        <h1>Uma boa conversa<br>começa com atenção.</h1>
-        <p>Organize as respostas da sua empresa, acompanhe os chamados e entre na conversa quando o cliente precisar de você.</p>
+      <a class="brand" href="/"><img src="/marca.svg" alt="Nelvo Company" width="180" height="59"></a>
+      <div class="story-copy"><span class="eyebrow">SUA OPERAÇÃO. MAIS CLARA.</span>
+        <h1>Da primeira conversa<br>ao próximo cliente.</h1>
+        <p>Encontre empresas, apresente o atendimento automático e acompanhe cada oportunidade de negócio.</p>
         <div class="story-note"><span class="status-dot" aria-hidden="true"></span>Automação com uma pessoa por perto.</div>
       </div>
-      <p class="story-footer">Seu espaço para cuidar de cada atendimento.</p>
+      <p class="story-footer">Prospecção · Comercial · Atendimento dos clientes</p>
     </section>
     <section class="login-card">
-      <span class="eyebrow">PAINEL DO OPERADOR</span><h2>Vamos começar.</h2>
-      <p>Entre para acompanhar suas empresas e conversas.</p>
+      <span class="eyebrow">CENTRAL NELVO</span><h2>Bem-vindo de volta.</h2>
+      <p>Entre para gerenciar oportunidades e empresas clientes.</p>
       <form id="login-form">
         <label for="admin-key">Chave administrativa</label>
         <input id="admin-key" name="admin-key" type="password" autocomplete="off" spellcheck="false" required placeholder="Informe sua ADMIN_API_KEY">
@@ -36,20 +36,51 @@
 
   <div id="app-screen" class="app-shell" hidden>
     <aside class="sidebar">
-      <a class="brand" href="/painel"><span class="brand-mark" aria-hidden="true">a</span>AtendeAI</a>
+      <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="true" aria-label="Recolher menu" type="button">☰ Menu</button>
+      <a class="brand" href="/painel"><img src="/marca.svg" alt="Nelvo Company" width="170" height="56"></a>
+      <p class="nav-label">OPERAÇÃO DA NELVO</p>
+      <nav class="nav" aria-label="Operação comercial">
+        <button class="nav-button active" data-view="dashboard" type="button"><span aria-hidden="true">◫</span>Visão geral</button>
+        <button class="nav-button" data-view="research" type="button"><span aria-hidden="true">⌕</span>Buscar empresas</button>
+        <button class="nav-button" data-view="funnel" type="button"><span aria-hidden="true">▥</span>Funil de aplicação</button>
+        <button class="nav-button" data-view="commercial" type="button"><span aria-hidden="true">↗</span>Comercial WhatsApp</button>
+      </nav>
+      <p class="nav-label client-label">CLIENTES · SISTEMA 3</p>
       <div class="company-picker"><label for="company-select">EMPRESA DE ATENDIMENTO</label><select id="company-select" aria-label="Empresa de atendimento"></select></div>
-      <button id="create-company" class="button secondary new-company" type="button">+ Nova empresa</button>
+      <button id="create-company" class="button secondary new-company" type="button">+ Cadastrar cliente</button>
       <nav class="nav" aria-label="Painel">
-        <button class="nav-button active" data-view="inbox" type="button" aria-current="page"><span aria-hidden="true">◉</span>Atendimento</button>
+        <button class="nav-button" data-view="inbox" type="button"><span aria-hidden="true">◉</span>Atendimentos</button>
         <button class="nav-button" data-view="knowledge" type="button"><span aria-hidden="true">▤</span>Base de respostas</button>
         <button class="nav-button" data-view="settings" type="button"><span aria-hidden="true">⚙</span>Configuração</button>
       </nav>
-      <div class="sidebar-bottom"><a href="/demonstracao" target="_blank" rel="noopener noreferrer">Testar demonstração ↗</a><a href="/docs" target="_blank" rel="noopener noreferrer">Documentação da API ↗</a><button id="logout" type="button">Sair do painel</button><small>AtendeAI · versão 0.4</small></div>
+      <div class="sidebar-bottom"><a href="/aplicar" target="_blank" rel="noopener noreferrer">Formulário de aplicação ↗</a><a href="/demonstracao" target="_blank" rel="noopener noreferrer">Testar atendimento ↗</a><a href="/docs" target="_blank" rel="noopener noreferrer">Documentação ↗</a><button id="logout" type="button">Sair do painel</button><small>Nelvo Company · 0.6.0</small></div>
     </aside>
     <main class="workspace">
       <header class="workspace-header"><div><span class="eyebrow" id="company-caption">SEU ESPAÇO DE ATENDIMENTO</span><h1 id="view-title">Atendimento</h1></div><div class="header-actions"><span class="private-badge"><span class="status-dot" aria-hidden="true"></span>Acesso administrativo</span><button id="refresh" class="button secondary" type="button">↻ Atualizar</button></div></header>
       <p id="load-error" class="inline-error" role="alert" hidden></p>
-      <section id="no-company" class="empty large-empty" hidden><span class="empty-symbol" aria-hidden="true">+</span><h2>Cadastre sua primeira empresa.</h2><p>Crie um espaço de atendimento para organizar respostas e receber conversas.</p><button id="create-first-company" class="button primary" type="button">Cadastrar empresa</button></section>
+      <div id="nelvo-workspace">
+        <section id="view-dashboard" class="view" hidden>
+          <div class="welcome-banner"><div><span class="eyebrow">COMERCIAL COM DIREÇÃO</span><h2>Cada oportunidade,<br>um próximo passo.</h2><p>A Nelvo oferece o atendimento automático. Aqui você acompanha quem pode se tornar cliente.</p><button class="button primary" data-open="research" type="button">Encontrar empresas →</button></div><div class="banner-art" aria-hidden="true"><span>01 · ENCONTRAR</span><span>02 · CONVERSAR</span><span>03 · IMPLANTAR</span></div></div>
+          <div class="metric-grid" id="dashboard-metrics"></div>
+          <div class="dashboard-grid"><section class="card padded"><div class="card-heading"><h2>Seu funil comercial</h2><button class="button quiet" data-open="funnel" type="button">Ver funil →</button></div><div id="dashboard-stages" class="stage-summary"></div></section><section class="card padded"><span class="eyebrow">PRÓXIMOS PASSOS</span><h2>Prepare sua operação</h2><div id="dashboard-checklist" class="checklist"></div><a href="/aplicar" class="button secondary" target="_blank" rel="noopener noreferrer">Abrir aplicação pública ↗</a><button id="copy-application" class="button quiet" type="button">Copiar link para compartilhar</button></section></div>
+        </section>
+        <section id="view-research" class="view" hidden>
+          <div class="section-intro"><p>Sistema 1 · Encontre empresas de São Paulo e interior para oferecer o atendimento automático.</p></div>
+          <form id="search-form" class="card padded search-form"><div><label for="search-city">Cidade</label><select id="search-city" required></select></div><div><label for="search-segment">Segmento</label><select id="search-segment" required></select></div><div><label for="search-limit">Quantidade máxima</label><select id="search-limit"><option value="30">30 empresas</option><option value="100">100 empresas</option><option value="200">200 empresas</option></select></div><button id="search-submit" class="button primary" type="submit">Buscar empresas →</button><p id="search-error" class="inline-error" role="alert" hidden></p></form>
+          <div class="section-intro results-heading"><div><h2>Empresas encontradas</h2><p id="search-source">Selecione os filtros para pesquisar ou consultar empresas salvas.</p></div><button id="load-leads" class="button secondary" type="button">Consultar salvas</button></div><div id="lead-list" class="lead-list"></div><div class="pagination"><button id="leads-prev" class="button secondary" type="button">← Anterior</button><span id="leads-page" class="muted"></span><button id="leads-next" class="button secondary" type="button">Próxima →</button></div>
+        </section>
+        <section id="view-funnel" class="view" hidden>
+          <div class="section-intro"><p>Do interesse à contratação: acompanhe as aplicações e as empresas adicionadas pela pesquisa.</p><a class="button primary" href="/aplicar" target="_blank" rel="noopener noreferrer">Abrir formulário ↗</a></div>
+          <form id="funnel-filter" class="toolbar card"><label class="visually-hidden" for="funnel-search">Buscar no funil</label><input id="funnel-search" maxlength="100" placeholder="Buscar pelo nome da empresa…"><label class="visually-hidden" for="funnel-stage">Etapa do funil</label><select id="funnel-stage"><option value="">Todas as etapas</option><option value="nova">Novas</option><option value="qualificacao">Qualificação</option><option value="demonstracao">Demonstração</option><option value="proposta">Proposta</option><option value="ganha">Contratadas</option><option value="perdida">Arquivadas</option></select><button class="button secondary" type="submit">Filtrar</button></form>
+          <p id="funnel-total" class="muted"></p><div id="funnel-board" class="funnel-board"></div><div class="pagination"><button id="funnel-prev" class="button secondary" type="button">← Anterior</button><span id="funnel-page" class="muted"></span><button id="funnel-next" class="button secondary" type="button">Próxima →</button></div>
+        </section>
+        <section id="view-commercial" class="view" hidden>
+          <div class="section-intro"><p>Sistema 2 · A Nelvo apresenta o atendimento automático às empresas e conversa sobre o serviço.</p></div>
+          <div id="commercial-status" class="card padded"></div>
+          <div class="section-intro results-heading"><div><h2>Abordagens e mensagens</h2><p>Crie a abordagem na pesquisa. Revise aqui e acompanhe o envio.</p></div><label class="visually-hidden" for="commercial-filter">Filtrar mensagens comerciais</label><select id="commercial-filter"><option value="">Todas as mensagens</option><option value="rascunho">Rascunhos</option><option value="aprovada">Aprovadas</option><option value="na_fila">Na fila</option><option value="aceita">Aceitas pela Meta</option><option value="falhou">Falhas</option></select></div><div id="commercial-messages" class="commercial-messages"></div><div class="pagination"><button id="commercial-prev" class="button secondary" type="button">← Anterior</button><span id="commercial-page" class="muted"></span><button id="commercial-next" class="button secondary" type="button">Próxima →</button></div><h2 class="section-title">Conversas comerciais</h2><div id="commercial-conversations" class="lead-list"></div><div class="pagination"><button id="sales-prev" class="button secondary" type="button">← Anterior</button><span id="sales-page" class="muted"></span><button id="sales-next" class="button secondary" type="button">Próxima →</button></div>
+        </section>
+      </div>
+      <section id="no-company" class="empty large-empty" hidden><span class="empty-symbol" aria-hidden="true">+</span><h2>Cadastre uma empresa cliente.</h2><p>Aqui fica o serviço vendido: cada cliente tem seu próprio atendimento e suas informações.</p><button id="create-first-company" class="button primary" type="button">Cadastrar cliente</button></section>
       <div id="company-workspace">
         <div class="overview"><div><span class="overview-label">AUTOMAÇÃO</span><strong id="automation-status">—</strong></div><div><span class="overview-label">WHATSAPP</span><strong id="whatsapp-status">—</strong></div><div><span class="overview-label">NOVAS CONVERSAS POR DIA</span><strong id="conversation-limit">—</strong></div></div>
         <section id="view-inbox" class="view">
@@ -89,8 +120,11 @@
     </main>
   </div>
 
-  <dialog id="company-dialog"><form id="company-form"><div class="dialog-heading"><div><span class="eyebrow">NOVO ESPAÇO</span><h2>Cadastrar empresa</h2></div><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><label for="new-name">Nome da empresa</label><input id="new-name" minlength="2" maxlength="200" required placeholder="Ex.: Oficina Horizonte"><label for="new-origins">Site da empresa</label><textarea id="new-origins" rows="2" placeholder="https://www.suaempresa.com"></textarea><p class="field-help">Uma origem HTTPS por linha, sem caminho. Você pode configurar o site depois.</p><label class="check-label"><input id="new-allow-test" type="checkbox" checked>Permitir também o chat de teste nesta API</label><label for="new-welcome">Mensagem de boas-vindas</label><textarea id="new-welcome" rows="3" maxlength="2000" required>Olá! Sou o assistente virtual de atendimento. Como posso ajudar?</textarea><p class="field-help">O cadastro começa com respostas da base e limite de 100 novas conversas por dia. Você pode alterar nas preferências.</p><p id="company-form-error" class="inline-error" role="alert" hidden></p><div class="dialog-footer"><button class="close-dialog button secondary" type="button">Cancelar</button><button class="button primary" type="submit">Cadastrar empresa</button></div></form></dialog>
+  <dialog id="company-dialog"><form id="company-form"><div class="dialog-heading"><div><span class="eyebrow">SERVIÇO DO CLIENTE · SISTEMA 3</span><h2>Cadastrar cliente</h2></div><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><label for="new-name">Nome da empresa</label><input id="new-name" minlength="2" maxlength="200" required placeholder="Ex.: Oficina Horizonte"><label for="new-origins">Site da empresa</label><textarea id="new-origins" rows="2" placeholder="https://www.suaempresa.com"></textarea><p class="field-help">Uma origem HTTPS por linha, sem caminho. Você pode configurar o site depois.</p><label class="check-label"><input id="new-allow-test" type="checkbox" checked>Permitir também o chat de teste nesta API</label><label for="new-welcome">Mensagem de boas-vindas</label><textarea id="new-welcome" rows="3" maxlength="2000" required>Olá! Sou o assistente virtual de atendimento. Como posso ajudar?</textarea><p class="field-help">O cadastro começa com respostas da base e limite de 100 novas conversas por dia. Depois, configure a IA e o WhatsApp próprios deste cliente.</p><p id="company-form-error" class="inline-error" role="alert" hidden></p><div class="dialog-footer"><button class="close-dialog button secondary" type="button">Cancelar</button><button class="button primary" type="submit">Cadastrar cliente</button></div></form></dialog>
   <dialog id="knowledge-dialog"><form id="knowledge-form"><div class="dialog-heading"><h2 id="knowledge-form-title">Nova resposta</h2><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><label for="knowledge-title">Assunto</label><input id="knowledge-title" minlength="2" maxlength="200" required placeholder="Ex.: Horário de atendimento"><label for="knowledge-text">Resposta cadastrada</label><textarea id="knowledge-text" rows="7" maxlength="2000" required placeholder="Informe os horários, condições ou informações reais da empresa."></textarea><label class="check-label"><input id="knowledge-active" type="checkbox" checked>Disponível para respostas automáticas</label><p id="knowledge-form-error" class="inline-error" role="alert" hidden></p><div class="dialog-footer"><button class="close-dialog button secondary" type="button">Cancelar</button><button class="button primary" type="submit">Salvar resposta</button></div></form></dialog>
   <dialog id="rotate-dialog"><div class="dialog-heading"><h2>Substituir chave do site?</h2><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><p>O código incorporado atualmente deixará de abrir novas conversas. Você precisará atualizar o código nos sites desta empresa.</p><p class="field-help">Conversas já abertas continuam com seus próprios tokens.</p><div class="dialog-footer"><button class="close-dialog button secondary" type="button">Cancelar</button><button id="confirm-rotate" class="button primary" type="button">Substituir chave</button></div></dialog>
+  <dialog id="funnel-dialog"><form id="funnel-detail-form"><div class="dialog-heading"><div><span id="application-origin" class="eyebrow"></span><h2 id="application-name"></h2></div><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><div id="application-details" class="detail-grid"></div><label for="application-stage">Etapa da aplicação</label><select id="application-stage"><option value="nova">Nova</option><option value="qualificacao">Qualificação</option><option value="demonstracao">Demonstração</option><option value="proposta">Proposta</option><option value="ganha">Contratada</option><option value="perdida">Arquivada</option></select><label for="application-notes">Anotações e próximo passo</label><textarea id="application-notes" rows="4" maxlength="4000" placeholder="Ex.: Demonstração agendada para sexta-feira."></textarea><p id="application-error" class="inline-error" role="alert" hidden></p><div class="dialog-footer"><button id="application-convert" class="button secondary" type="button">Cadastrar como cliente</button><button class="button primary" type="submit">Salvar aplicação</button></div><p id="application-convert-help" class="field-help"></p></form></dialog>
+  <dialog id="lead-dialog"><div class="dialog-heading"><h2 id="lead-name"></h2><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><div id="lead-details" class="detail-grid"></div><form id="lead-review-form"><label for="lead-review">Revisão da empresa</label><select id="lead-review"><option value="pendente">Pendente</option><option value="aprovada">Aprovada</option><option value="descartada">Descartada</option></select><label for="lead-note">Observação</label><textarea id="lead-note" maxlength="2000" rows="2"></textarea><button class="button secondary" type="submit">Salvar revisão</button></form><form id="lead-consent-form"><h3>Autorização para WhatsApp</h3><p class="field-help">Um telefone publicado não autoriza a abordagem. Registre a autorização real da empresa para receber a oferta da Nelvo.</p><label for="lead-phone">WhatsApp autorizado</label><input id="lead-phone" type="tel" required placeholder="+55 DDD número"><label for="lead-consent-status">Situação</label><select id="lead-consent-status"><option value="concedido">Autorizou o contato</option><option value="revogado">Revogou a autorização</option></select><label for="lead-evidence">Evidência verificável da autorização ou revogação</label><textarea id="lead-evidence" required minlength="20" maxlength="4000" rows="3" placeholder="Origem, data e registro da autorização da empresa."></textarea><p id="lead-action-error" class="inline-error" role="alert" hidden></p><button class="button secondary" type="submit">Registrar autorização</button></form><div class="dialog-footer"><button id="lead-add-funnel" class="button secondary" type="button">Adicionar ao funil</button><button id="lead-draft" class="button primary" type="button">Criar abordagem</button></div></dialog>
+  <dialog id="sales-dialog"><div class="dialog-heading"><h2 id="sales-title">Conversa comercial</h2><button class="close-dialog" type="button" aria-label="Fechar">×</button></div><div id="sales-history" class="sales-history"></div><div class="pagination"><button id="sales-history-prev" class="button quiet" type="button">← Mais antigas</button><span id="sales-history-page" class="muted"></span><button id="sales-history-next" class="button quiet" type="button">Mais recentes →</button></div><p id="sales-help" class="field-help"></p><button id="sales-pause" class="button secondary" type="button">Pausar respostas automáticas</button></dialog>
 </body>
 </html>
