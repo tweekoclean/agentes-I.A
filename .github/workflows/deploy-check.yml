@@ -21,23 +21,23 @@ jobs:
           from urllib.parse import parse_qs, urlsplit
           import time
           import httpx
-          base = "https://atendeai-co.squareweb.app"
+          base = "https://nelvo.squareweb.app"
           with httpx.Client(timeout=10, follow_redirects=False) as client:
               for attempt in range(18):
                   try:
                       response = client.get(base + "/")
                       response.raise_for_status()
-                      if response.json().get("versao") == "0.7.0":
+                      if response.json().get("versao") == "0.7.1":
                           break
                   except (httpx.HTTPError, ValueError):
                       pass
                   if attempt == 17:
-                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.7.0.")
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.7.1.")
                   time.sleep(5)
               health = client.get(base + "/health")
               health.raise_for_status()
               assert health.json()["status"] == "ok"
-              print("Versão 0.7.0 publicada; banco conectado.")
+              print("Versão 0.7.1 publicada; banco conectado.")
               for route in ("/painel", "/painel/painel.css", "/painel/painel.js", "/aplicar", "/aplicar/formulario.js", "/marca.png", "/home/home.css", "/home/home.js"):
                   panel = client.get(base + route)
                   panel.raise_for_status()

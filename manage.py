@@ -25,7 +25,7 @@ def main():
         statements = [str(CreateTable(table).compile(dialect=dialect)) + ";" for table in Base.metadata.sorted_tables]
         statements += [str(CreateIndex(index).compile(dialect=dialect)) + ";" for table in Base.metadata.sorted_tables for index in table.indexes]
         path = Path("schema-postgresql.sql")
-        content = "-- Nelvo Company 0.7.0: criar em um banco vazio, uma única vez.\n" + "\n\n".join(statements)
+        content = "-- Nelvo Company 0.7.1: criar em um banco vazio, uma única vez.\n" + "\n\n".join(statements)
         path.write_text("\n".join(line.rstrip() for line in content.splitlines()).rstrip() + "\n", encoding="utf-8")
         print("schema-postgresql.sql gerado.")
         return

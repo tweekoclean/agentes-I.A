@@ -671,6 +671,29 @@ class SupportTests(unittest.TestCase):
         self.assertEqual(self.ai_calls, [])
         self.assertEqual(self.calls, [])
 
+    def test_demo_moves_legacy_origin_without_resetting_operator_settings(self):
+        from atendeai.support import DEMO_TENANT_ID, DEMO_SITE_KEY, DEMO_ORIGIN, LEGACY_DEMO_ORIGIN
+        self.service.ensure_demo()
+        with self.sessions() as session:
+            tenant = session.get(SupportTenant, DEMO_TENANT_ID)
+            tenant.allowed_origins = [LEGACY_DEMO_ORIGIN, "https://custom.example.invalid"]
+            tenant.ai_enabled = True
+            tenant.daily_conversation_limit = 42
+            tenant.welcome_text = "Boas-vindas configuradas pelo operador."
+            session.commit()
+        self.service.ensure_demo()
+        self.service.ensure_demo()
+        with self.sessions() as session:
+            tenant = session.get(SupportTenant, DEMO_TENANT_ID)
+            self.assertEqual(tenant.allowed_origins, [DEMO_ORIGIN, "https://custom.example.invalid"])
+            self.assertTrue(tenant.ai_enabled)
+            self.assertEqual(tenant.daily_conversation_limit, 42)
+            self.assertEqual(tenant.welcome_text, "Boas-vindas configuradas pelo operador.")
+        self.chat({"id": DEMO_TENANT_ID, "chave_site": DEMO_SITE_KEY}, origin=DEMO_ORIGIN)
+        rejected = self.client.post(f"/v1/atendimento/site/{DEMO_TENANT_ID}/conversas",
+                                   headers={"Origin": LEGACY_DEMO_ORIGIN, "X-Site-Key": DEMO_SITE_KEY})
+        self.assertEqual(rejected.status_code, 403)
+
 
 class SupportConfigurationTests(unittest.TestCase):
     def test_environment_accounts_are_private_and_duplicates_rejected(self):

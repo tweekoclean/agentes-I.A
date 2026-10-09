@@ -4,7 +4,7 @@ Esta etapa apresenta a proposta da Nelvo Company aos contatos autorizados, regis
 
 ## Conferir a implantação
 
-Abra [a documentação da API](https://atendeai-co.squareweb.app/docs), clique em **Authorize** e informe sua `ADMIN_API_KEY`. Execute `GET /v1/comercial/status`. A versão sem credenciais inicia normalmente, mantém a pesquisa disponível e informa as variáveis pendentes. `envio_ativo=false` é esperado antes da configuração.
+Abra [a documentação da API](https://nelvo.squareweb.app/docs), clique em **Authorize** e informe sua `ADMIN_API_KEY`. Execute `GET /v1/comercial/status`. A versão sem credenciais inicia normalmente, mantém a pesquisa disponível e informa as variáveis pendentes. `envio_ativo=false` é esperado antes da configuração.
 
 O deploy cria as cinco novas tabelas comerciais automaticamente, preservando as empresas e os registros de consentimento existentes. Não execute `schema-postgresql.sql` novamente sobre o banco atual; o arquivo completo serve para um banco vazio.
 
@@ -35,7 +35,7 @@ Os segredos ficam no ambiente. Eles não aparecem no status, nas mensagens de er
 Configure na Meta a URL de callback:
 
 ```text
-https://atendeai-co.squareweb.app/webhooks/whatsapp
+https://nelvo.squareweb.app/webhooks/whatsapp
 ```
 
 Use o mesmo `WHATSAPP_VERIFY_TOKEN`, assine o campo de eventos `messages` e vincule a conta WhatsApp Business ao aplicativo conforme o fluxo da Meta. O GET devolve o desafio de verificação; o POST exige `X-Hub-Signature-256`, calculado sobre o corpo bruto com o segredo do aplicativo. Eventos de outro `phone_number_id` são ignorados. Reinicie a aplicação após mudar as variáveis.

@@ -4,12 +4,12 @@ O atendimento usa a API da AtendeAI no seu servidor, com um chat incorporável p
 
 ## Cadastrar uma empresa e suas respostas
 
-Em [/docs](https://atendeai-co.squareweb.app/docs), faça **Authorize** com sua ADMIN_API_KEY e execute `POST /v1/atendimento/empresas`:
+Em [/docs](https://nelvo.squareweb.app/docs), faça **Authorize** com sua ADMIN_API_KEY e execute `POST /v1/atendimento/empresas`:
 
 ```json
 {
   "nome": "Nome da empresa",
-  "origens_permitidas": ["https://www.site-da-empresa.com", "https://atendeai-co.squareweb.app"],
+  "origens_permitidas": ["https://www.site-da-empresa.com", "https://nelvo.squareweb.app"],
   "boas_vindas": "Olá! Sou o assistente virtual da empresa. Como posso ajudar?",
   "ia_habilitada": false,
   "limite_conversas_dia": 100,
@@ -38,16 +38,16 @@ O limite diário de IA é reservado no banco antes da chamada, no fuso de São P
 Inclua antes de fechar o body, substituindo os dois valores:
 
 ```html
-<script src="https://atendeai-co.squareweb.app/widget/atendeai.js"
+<script src="https://nelvo.squareweb.app/widget/atendeai.js"
         data-empresa="ID_DA_EMPRESA" data-chave="CHAVE_SITE" defer></script>
 ```
 
 O botão Atendimento abre a conversa. O widget usa a chave pública para criar a sessão e um token privado por conversa para consultar/enviar mensagens. O token fica no sessionStorage da aba quando disponível. ADMIN_API_KEY nunca deve entrar no widget.
 
-Para a página de teste, cadastre a origem https://atendeai-co.squareweb.app e abra:
+Para a página de teste, cadastre a origem https://nelvo.squareweb.app e abra:
 
 ```text
-https://atendeai-co.squareweb.app/teste-atendimento?empresa=ID_DA_EMPRESA&chave=CHAVE_SITE
+https://nelvo.squareweb.app/teste-atendimento?empresa=ID_DA_EMPRESA&chave=CHAVE_SITE
 ```
 
 Teste “qual o horário de atendimento?” e “quero falar com um atendente”. O servidor precisa estar na versão 0.3.
@@ -66,7 +66,7 @@ O POST grava na fila e o worker responde depois. O widget consulta a cada dois s
 
 ## Atendimento humano
 
-Abra [o painel do operador](https://atendeai-co.squareweb.app/painel) e informe sua `ADMIN_API_KEY`. Selecione a empresa, abra **Atendimento** e clique no chamado. O histórico aparece ao lado da fila. **Assumir atendimento** pausa o bot; enviar uma resposta também mantém o bot pausado. A resposta é registrada na mesma conversa do cliente. Depois de concluir o pedido, use **Concluir e retomar automático**.
+Abra [o painel do operador](https://nelvo.squareweb.app/painel) e informe sua `ADMIN_API_KEY`. Selecione a empresa, abra **Atendimento** e clique no chamado. O histórico aparece ao lado da fila. **Assumir atendimento** pausa o bot; enviar uma resposta também mantém o bot pausado. A resposta é registrada na mesma conversa do cliente. Depois de concluir o pedido, use **Concluir e retomar automático**.
 
 A chave administrativa fica apenas em memória e precisa ser informada novamente após recarregar ou sair. O painel não deve ser distribuído com essa chave aos clientes: ela concede acesso a todas as empresas. A versão atual tem um operador administrativo; não há contas individuais ou permissões por funcionário. Base e configuração podem ser gerenciadas pelo painel sem executar rotas manualmente.
 
@@ -95,7 +95,7 @@ Use o ID real retornado pelo cadastro e o ID numérico real do remetente. O exem
 Cadastre na Meta:
 
 ```text
-https://atendeai-co.squareweb.app/webhooks/atendimento/whatsapp/ID_DA_EMPRESA
+https://nelvo.squareweb.app/webhooks/atendimento/whatsapp/ID_DA_EMPRESA
 ```
 
 Repita verify_token, habilite eventos messages e vincule a conta ao aplicativo conforme o fluxo da Meta. O servidor verifica HMAC do corpo e phone_number_id. Reinicie após alterar o ambiente. Para várias contas no mesmo aplicativo Meta, valide os callbacks/subscrições no provedor; esta versão oferece uma URL por empresa, sem Embedded Signup ou roteador único para várias contas.
@@ -112,7 +112,7 @@ Referências: [política WhatsApp Business](https://business.whatsapp.com/policy
 
 ## Demonstração pronta
 
-Abra [a demonstração](https://atendeai-co.squareweb.app/demonstracao). Ela usa um cadastro separado chamado AtendeAI — Demonstração, com respostas por regras/base, sem ativação de IA paga ou conta WhatsApp. Pergunte “quais serviços vocês oferecem?” e depois “quero falar com um atendente”. O segundo pedido cria um chamado real na fila dessa empresa de teste e pausa o bot. Use as rotas administrativas da empresa 00000000-0000-4000-a000-000000000003 para consultar/responder.
+Abra [a demonstração](https://nelvo.squareweb.app/demonstracao). Ela usa um cadastro separado chamado AtendeAI — Demonstração, com respostas por regras/base, sem ativação de IA paga ou conta WhatsApp. Pergunte “quais serviços vocês oferecem?” e depois “quero falar com um atendente”. O segundo pedido cria um chamado real na fila dessa empresa de teste e pausa o bot. Use as rotas administrativas da empresa 00000000-0000-4000-a000-000000000003 para consultar/responder.
 
 SUPPORT_DEMO_ENABLED=false desativa a página e a criação inicial da demonstração. A inicialização preserva alterações anteriores e não duplica a empresa/base. Desative também a empresa pela API se desejar bloquear sessões já abertas. O teto padrão é de 100 novas conversas por dia para a demonstração.
 

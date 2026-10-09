@@ -19,7 +19,8 @@ from .support_policy import (ASK_HANDOFF, CONFIRMATION_PREFIX, DECLINE_HANDOFF,
 
 DEMO_TENANT_ID = "00000000-0000-4000-a000-000000000003"
 DEMO_SITE_KEY = "atendeai-demonstracao-publica"
-DEMO_ORIGIN = "https://atendeai-co.squareweb.app"
+DEMO_ORIGIN = "https://nelvo.squareweb.app"
+LEGACY_DEMO_ORIGIN = "https://atendeai-co.squareweb.app"
 
 SUPPORT_HANDOFF = "Estou encaminhando seu chamado para um responsável dar continuidade ao atendimento."
 
@@ -61,6 +62,11 @@ class SupportService:
                 welcome_text="Olá! Esta é uma demonstração do atendimento da AtendeAI. Pergunte quais serviços oferecemos ou como funciona o encaminhamento para uma pessoa.",
                 active=True, ai_enabled=False, daily_conversation_limit=100, daily_ai_limit=100)
                 .on_conflict_do_nothing(index_elements=["id"]))
+            # Troca apenas a origem antiga da demonstração; mantém configurações do operador.
+            demo = session.scalar(select(SupportTenant).where(SupportTenant.id == DEMO_TENANT_ID).with_for_update())
+            if LEGACY_DEMO_ORIGIN in demo.allowed_origins:
+                demo.allowed_origins = list(dict.fromkeys(
+                    DEMO_ORIGIN if origin == LEGACY_DEMO_ORIGIN else origin for origin in demo.allowed_origins))
             examples = [
                 ("00000000-0000-4000-a000-000000000031", "Serviços da AtendeAI",
                  "A proposta da AtendeAI é automatizar o atendimento por site e WhatsApp, organizar as conversas e encaminhar dúvidas para uma pessoa quando necessário. O WhatsApp depende da configuração oficial da conta."),
