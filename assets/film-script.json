@@ -1,0 +1,14 @@
+{
+  "duration": 45,
+  "voice": "pt_BR-faber-medium",
+  "voice_source": "https://huggingface.co/rhasspy/piper-voices/tree/main/pt/pt_BR/faber/medium",
+  "voice_dataset_license": "CC0",
+  "chapters": [
+    {"start": 0, "end": 4, "text": "Sua ideia pode virar o próximo passo do seu negócio."},
+    {"start": 4, "end": 13, "text": "Com a Nelvo, seu cliente conversa com inteligência artificial, recebe informações e pode chamar uma pessoa quando precisar."},
+    {"start": 13, "end": 22, "text": "Criamos sites com a identidade da sua empresa, pensados para apresentar seus serviços e facilitar o contato."},
+    {"start": 22, "end": 32, "text": "Desenvolvemos sistemas e vendas automáticas para atender quando a equipe está indisponível, aproveitar oportunidades e ajudar a vender mais."},
+    {"start": 32, "end": 39, "text": "Seu site já existe? Reformulamos a experiência, a organização e o visual para acompanhar seu crescimento."},
+    {"start": 39, "end": 45, "text": "Nelvo. Tecnologia para o seu negócio. Conte sua ideia. Vamos construir seu próximo passo."}
+  ]
+}

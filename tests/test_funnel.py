@@ -37,7 +37,7 @@ class FunnelTests(unittest.TestCase):
         return response.json()["protocolo"]
 
     def test_public_form_and_browser_root_with_api_compatibility(self):
-        for path in ("/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.svg", "/home/home.css", "/home/home.js"):
+        for path in ("/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.svg", "/home/home.css", "/home/home.js", "/home/tema.js"):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertNotIn(KEY, response.text)
@@ -62,7 +62,7 @@ class FunnelTests(unittest.TestCase):
         self.assertEqual(logo.headers["content-type"], "image/png")
         self.assertTrue(logo.content.startswith(b"\x89PNG"))
         self.assertIn("Accept", html.headers["vary"])
-        self.assertEqual(self.client.get("/").json()["versao"], "0.9.0")
+        self.assertEqual(self.client.get("/").json()["versao"], "0.10.0")
 
     def test_public_submission_stores_application_without_customer_or_outreach(self):
         body = application(); identifier = self.submit(body)

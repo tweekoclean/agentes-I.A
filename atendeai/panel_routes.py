@@ -63,6 +63,10 @@ def panel_router():
     def home_script():
         return FileResponse(STATIC / "home.js", media_type="application/javascript", headers=HEADERS)
 
+    @router.get("/home/tema.js", include_in_schema=False)
+    def theme_script():
+        return FileResponse(STATIC / "theme.js", media_type="application/javascript", headers=HEADERS)
+
     @router.get("/home/visuais/{asset}", include_in_schema=False)
     def visual_asset(asset: str):
         from fastapi import HTTPException

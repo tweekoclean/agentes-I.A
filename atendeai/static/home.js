@@ -73,7 +73,7 @@
   const tabs = [...document.querySelectorAll(".service-tabs button")];
   const panels = [...document.querySelectorAll(".solution-card")];
   const markers = tabs.map((_, i) => $("service-marker-" + i));
-  let active = -1, queued = false, navigation = null;
+  let active = -1, queued = false, navigation = null, navigationTimer;
   function setService(index) {
     if (index === active) return;
     active = index;
@@ -83,6 +83,11 @@
   function stickyTop() { return parseFloat(getComputedStyle(panels[0]).top) || 110; }
   function updateScroll() {
     queued = false;
+    const gallery = document.querySelector(".studio-showcase img");
+    if (gallery && !reduced.matches) {
+      const rect = gallery.getBoundingClientRect();
+      if (rect.bottom > 0 && rect.top < innerHeight) gallery.style.setProperty("--image-y", Math.max(-14, Math.min(14, (innerHeight / 2 - rect.top) * .025)) + "px");
+    }
     if (navigation && Math.abs(window.scrollY - navigation.top) > 4 && performance.now() < navigation.until) return;
     navigation = null;
     let index = 0;
@@ -95,6 +100,8 @@
     if (focus) tabs[index].focus({ preventScroll: true });
     const destination = window.scrollY + markers[index].getBoundingClientRect().top - stickyTop();
     navigation = { top: destination, until: performance.now() + 2000 };
+    clearTimeout(navigationTimer);
+    navigationTimer = setTimeout(() => { navigation = null; schedule(); }, 2050);
     window.scrollTo({ top: destination, behavior: reduced.matches ? "instant" : "smooth" });
   }
   tabs.forEach((tab, i) => {
@@ -105,13 +112,28 @@
     });
   });
   const film = $("nelvo-film");
+  const sound = $("film-sound");
+  function updateSound() {
+    const audible = !film.muted && film.volume > 0;
+    film.loop = !audible;
+    sound.setAttribute("aria-pressed", String(audible));
+    $("film-sound-label").textContent = audible ? "Silenciar" : "Ativar som";
+  }
+  sound.addEventListener("click", () => {
+    if (film.muted || film.volume === 0) { film.currentTime = 0; film.muted = false; film.volume = .8; film.play().catch(() => {}); }
+    else film.muted = true;
+    updateSound();
+  });
+  film.addEventListener("volumechange", updateSound);
   let userPaused = false, automaticPause = false;
   film.addEventListener("pause", () => { if (!automaticPause && !film.ended) userPaused = true; });
   film.addEventListener("play", () => { userPaused = false; automaticPause = false; });
+  film.addEventListener("ended", () => { userPaused = true; });
   function pauseFilm() { automaticPause = true; film.pause(); }
   function resumeFilm() { if (!userPaused && !reduced.matches && !document.hidden) { automaticPause = false; film.play().catch(() => {}); } }
   document.body.classList.add("motion-ready");
   function updatePreference() {
+    if (navigation) window.scrollTo({ top: window.scrollY, behavior: "instant" });
     document.body.classList.toggle("motion-reduced", reduced.matches);
     document.body.classList.toggle("short-viewport", compactHeight.matches);
     document.body.classList.remove("services-compact");
@@ -119,7 +141,7 @@
     document.body.classList.toggle("services-compact", oversized);
     film.autoplay = !reduced.matches;
     if (reduced.matches) pauseFilm();
-    navigation = null; schedule();
+    navigation = null; clearTimeout(navigationTimer); schedule();
   }
   reduced.addEventListener("change", updatePreference); compactHeight.addEventListener("change", updatePreference);
   window.addEventListener("scroll", schedule, { passive: true });
@@ -133,6 +155,14 @@
   }, { threshold: 0.12 });
   reveals.forEach((element) => { element.classList.add("scroll-reveal"); revealObserver.observe(element); });
   const motionObserver = new IntersectionObserver((entries) => { entries.forEach((entry) => entry.target.classList.toggle("in-view", entry.isIntersecting)); });
-  motionObserver.observe(story); motionObserver.observe(document.querySelector(".hero"));
+  motionObserver.observe(story); motionObserver.observe(document.querySelector(".hero")); motionObserver.observe(document.querySelector(".closing"));
+  const filmScene = document.querySelector(".hero-film");
+  filmScene.addEventListener("pointermove", event => {
+    if (reduced.matches || !matchMedia("(pointer:fine)").matches) return;
+    const rect = filmScene.getBoundingClientRect();
+    filmScene.style.setProperty("--pointer-x", ((event.clientX - rect.left) / rect.width - .5) * 8 + "px");
+    filmScene.style.setProperty("--pointer-y", ((event.clientY - rect.top) / rect.height - .5) * 8 + "px");
+  });
+  filmScene.addEventListener("pointerleave", () => { filmScene.style.setProperty("--pointer-x", "0px"); filmScene.style.setProperty("--pointer-y", "0px"); });
   setService(0); updatePreference();
 })();

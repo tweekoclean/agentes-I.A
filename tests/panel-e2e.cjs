@@ -34,6 +34,7 @@ async function noOverflow(page, label) {
   assert.equal(overflow, false, label + " cabe na tela");
 }
 async function scrollService(page, index, label) {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.evaluate((index) => {
     const marker = document.getElementById("service-marker-" + index);
     const panel = document.getElementById("service-panel-" + index);
@@ -87,6 +88,15 @@ async function scrollService(page, index, label) {
   await applicant.goto(base + "/");
   await visible(applicant, ".home-page");
   await noOverflow(applicant, "Home desktop");
+  assert.equal(Math.round((await applicant.locator(".site-header").boundingBox()).width), 1440, "Navbar acompanha toda a largura da página");
+  await applicant.locator("[data-theme-toggle]").click();
+  assert.equal(await applicant.locator("html").getAttribute("data-theme"), "dark");
+  await applicant.reload();
+  assert.equal(await applicant.locator("html").getAttribute("data-theme"), "dark", "Tema permanece após recarregar");
+  assert.equal(await applicant.locator("[data-theme-toggle]").getAttribute("aria-label"), "Ativar tema claro");
+  await applicant.screenshot({ path: path.join(output, "home-dark-desktop.png"), fullPage: true });
+  await applicant.locator("[data-theme-toggle]").click();
+  assert.equal(await applicant.locator("html").getAttribute("data-theme"), "light");
   assert.equal(await applicant.locator("#public-application-form").count(), 0, "Formulário carregado ao abrir o popup");
   assert.equal(await applicant.locator(".solution-card").count(), 4);
   assert.equal(await applicant.locator(".nelvo-logo img").first().evaluate((img) => img.complete && img.naturalWidth > 0), true, "Logo original carregada");
