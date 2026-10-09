@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 STATIC = Path(__file__).parent / "static"
 HEADERS = {
@@ -15,7 +15,9 @@ HEADERS = {
 
 
 def application_page():
-    return FileResponse(STATIC / "application.html", media_type="text/html", headers=HEADERS)
+    markup = (STATIC / "application.html").read_text(encoding="utf-8").replace(
+        "<!--APPLICATION_FORM-->", (STATIC / "application-form.html").read_text(encoding="utf-8"))
+    return HTMLResponse(markup, headers=HEADERS)
 
 
 def home_page():
@@ -49,6 +51,10 @@ def panel_router():
 
     router.add_api_route("/aplicar", application_page, methods=["GET"], include_in_schema=False)
 
+    @router.get("/aplicar/conteudo", include_in_schema=False)
+    def application_content():
+        return FileResponse(STATIC / "application-form.html", media_type="text/html", headers=HEADERS)
+
     @router.get("/home/home.css", include_in_schema=False)
     def home_stylesheet():
         return FileResponse(STATIC / "home.css", media_type="text/css", headers=HEADERS)
@@ -59,7 +65,7 @@ def panel_router():
 
     @router.get("/marca.png", include_in_schema=False)
     def original_brand():
-        return FileResponse(STATIC / "nelvo-logo.png", media_type="image/png", headers=HEADERS)
+        return FileResponse(STATIC / "nelvo-logo-transparent.png", media_type="image/png", headers=HEADERS)
 
     @router.get("/aplicar/formulario.js", include_in_schema=False)
     def application_script():

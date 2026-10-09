@@ -33,6 +33,23 @@ async function noOverflow(page, label) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   assert.equal(overflow, false, label + " cabe na tela");
 }
+async function scrollService(page, index, label) {
+  await page.evaluate((index) => {
+    const story = document.getElementById("services-story");
+    const pin = story.querySelector(".services-pin");
+    const top = parseFloat(getComputedStyle(pin).top);
+    const distance = story.offsetHeight - pin.offsetHeight;
+    window.scrollTo({ top: window.scrollY + story.getBoundingClientRect().top - top + distance * ((index + .5) / 4), behavior: "instant" });
+  }, index);
+  await waitFor(async () => await page.locator("#service-tab-" + index).getAttribute("aria-selected") === "true", label);
+  assert.equal(await page.locator(".solution-card:visible").count(), 1, "Um serviço por vez");
+  await delay(550);
+  await noOverflow(page, label);
+  const pin = await page.locator(".services-pin").boundingBox();
+  const viewport = page.viewportSize();
+  assert(pin.y >= 0 && pin.y + pin.height <= viewport.height + 3, label + " fica visível durante o scroll");
+  await page.screenshot({ path: path.join(output, label + ".png") });
+}
 
 (async () => {
   await fs.mkdir(output, { recursive: true });
@@ -72,17 +89,33 @@ async function noOverflow(page, label) {
   await applicant.goto(base + "/");
   await visible(applicant, ".home-page");
   await noOverflow(applicant, "Home desktop");
-  assert.equal(await applicant.locator("#public-application-form").count(), 0, "Home separada do formulário");
+  assert.equal(await applicant.locator("#public-application-form").count(), 0, "Formulário carregado ao abrir o popup");
   assert.equal(await applicant.locator(".solution-card").count(), 4);
   assert.equal(await applicant.locator(".nelvo-logo img").first().evaluate((img) => img.complete && img.naturalWidth > 0), true, "Logo original carregada");
   await applicant.screenshot({ path: path.join(output, "home-desktop.png"), fullPage: true });
   await applicant.screenshot({ path: path.join(output, "home-hero-desktop.png") });
+  for (let index = 0; index < 4; index++) await scrollService(applicant, index, "servico-desktop-" + (index + 1));
+  await applicant.locator("#motion-toggle").click();
+  assert.equal(await applicant.locator("#motion-toggle").getAttribute("aria-pressed"), "true");
+  assert.equal(await applicant.locator(".redesign-scan").evaluate((el) => getComputedStyle(el).animationPlayState), "paused");
+  await applicant.locator("#motion-toggle").click();
+  await applicant.evaluate(() => window.scrollTo({top: 0, behavior: "instant"}));
   await applicant.locator(".hero-actions .cta").click();
-  assert.equal(new URL(applicant.url()).pathname, "/aplicar");
+  assert.equal(new URL(applicant.url()).pathname, "/");
+  assert.equal(await applicant.locator("#application-modal").evaluate((el) => el.open), true);
   await visible(applicant, "#apply-company");
+  await delay(450);
   await noOverflow(applicant, "Aplicação desktop");
-  await applicant.screenshot({ path: path.join(output, "aplicacao-desktop.png"), fullPage: true });
+  await applicant.screenshot({ path: path.join(output, "aplicacao-desktop.png") });
   await applicant.locator("#apply-company").fill('Pizzaria do Bairro <img src=x onerror="window.__xss=true">');
+  await applicant.keyboard.press("Escape");
+  assert.equal(await applicant.locator("#application-modal").isVisible(), false);
+  assert.equal(await applicant.locator(".hero-actions .cta").evaluate((el) => el === document.activeElement), true, "Foco volta ao botão");
+  await applicant.locator(".hero-actions .cta").click();
+  assert((await applicant.locator("#apply-company").inputValue()).startsWith("Pizzaria do Bairro"), "Fechar preserva o preenchimento");
+  await applicant.locator("#application-modal-close").focus();
+  await applicant.keyboard.press("Shift+Tab");
+  assert.equal(await applicant.evaluate(() => document.activeElement.closest("dialog")?.id), "application-modal", "Teclado permanece no popup");
   await applicant.locator("#apply-city").fill("Campinas");
   await applicant.locator("#apply-state").selectOption("SP");
   await applicant.locator("#apply-segment").selectOption("restaurantes");
@@ -126,9 +159,13 @@ async function noOverflow(page, label) {
   assert.equal(await panel.evaluate(() => Boolean(window.__xss)), false);
   const apps = (await get("/v1/funil", true)).aplicacoes;
   assert(apps.find((item) => item.nome_empresa.startsWith("Pizzaria do Bairro")).cliente_id, "Aplicação vinculada ao serviço do cliente");
+  await applicant.locator("#application-new-request").click();
+  assert.equal(await applicant.locator("#apply-company").inputValue(), "", "Nova solicitação começa vazia");
+  assert.equal(await applicant.locator("#application-step-1").isVisible(), true);
 
   // Projeto web de outro estado: seleção pela home, URL obrigatória e nenhuma implantação de atendimento.
   await applicant.goto(base + "/");
+  await scrollService(applicant, 3, "servico-reformulacao-cta");
   await applicant.locator('a[href="/aplicar?servico=reformulacao_site"]').click();
   await applicant.locator("#apply-company").fill("Studio Web Nacional · teste");
   await applicant.locator("#apply-city").fill("Belo Horizonte");
@@ -201,6 +238,31 @@ async function noOverflow(page, label) {
   await noOverflow(applicant, "Home móvel");
   await applicant.screenshot({ path: path.join(output, "home-mobile.png"), fullPage: true });
   await applicant.screenshot({ path: path.join(output, "home-hero-mobile.png") });
+  for (let index = 0; index < 4; index++) await scrollService(applicant, index, "servico-mobile-" + (index + 1));
+  await applicant.locator('a[href="/aplicar?servico=reformulacao_site"]').click();
+  await visible(applicant, "#apply-company");
+  await noOverflow(applicant, "Popup móvel");
+  await delay(450);
+  await applicant.screenshot({ path: path.join(output, "popup-mobile.png") });
+  await applicant.locator("#apply-company").fill("Empresa teste móvel");
+  await applicant.locator("#apply-city").fill("Recife");
+  await applicant.locator("#apply-state").selectOption("PE");
+  await applicant.locator("#apply-segment").selectOption("outro");
+  await applicant.locator("#apply-contact").fill("Responsável Teste");
+  await applicant.locator("#apply-phone").fill("(81) 91234-5678");
+  await applicant.locator("#application-next").click();
+  await visible(applicant, "#apply-service-reformulacao_site");
+  await noOverflow(applicant, "Projeto no popup móvel");
+  await delay(450);
+  await applicant.screenshot({ path: path.join(output, "popup-projeto-mobile.png") });
+  await applicant.locator("#application-modal-close").click();
+  await applicant.emulateMedia({ reducedMotion: "reduce" });
+  await applicant.locator("#service-tab-0").click();
+  await applicant.keyboard.press("ArrowRight");
+  assert.equal(await applicant.locator("#service-tab-1").getAttribute("aria-selected"), "true");
+  assert.equal(await applicant.locator(".services-pin").evaluate((el) => getComputedStyle(el).position), "static");
+  await applicant.emulateMedia({ reducedMotion: "no-preference" });
+  await applicant.evaluate(() => window.scrollTo({top: 0, behavior: "instant"}));
   await applicant.locator("#home-menu-toggle").click();
   assert.equal(await applicant.locator("#home-menu-toggle").getAttribute("aria-expanded"), "true");
   await applicant.locator('#home-nav a[href="#duvidas"]').click();
@@ -211,6 +273,25 @@ async function noOverflow(page, label) {
   await visible(applicant, "#apply-company");
   await noOverflow(applicant, "Aplicação móvel");
   await applicant.screenshot({ path: path.join(output, "aplicacao-mobile.png"), fullPage: true });
+  // Falha temporária: reabrir o fragmento mantém apenas uma instância do formulário.
+  let unavailable = true;
+  await applicant.route("**/aplicar/conteudo", (route) => unavailable ? route.fulfill({ status: 503, body: "Indisponível" }) : route.continue());
+  await applicant.goto(base + "/");
+  await applicant.locator(".hero-actions .cta").click();
+  await visible(applicant, '#application-modal button:has-text("Tentar novamente")');
+  assert.equal(await applicant.locator('#application-modal a[data-standalone]').getAttribute("href"), "/aplicar");
+  unavailable = false;
+  await applicant.getByRole("button", { name: "Tentar novamente" }).click();
+  await visible(applicant, "#apply-company");
+  assert.equal(await applicant.locator("#public-application-form").count(), 1);
+  await applicant.locator("#application-modal-close").click();
+  // Conteúdo permanece acessível mesmo em uma tela estreita ou baixa.
+  await applicant.setViewportSize({ width: 320, height: 780 });
+  await applicant.locator("#service-tab-3").click();
+  assert.equal(await applicant.locator(".services-pin").evaluate((el) => getComputedStyle(el).position), "static");
+  await noOverflow(applicant, "Home estreita");
+  await applicant.setViewportSize({ width: 768, height: 1024 });
+  await scrollService(applicant, 2, "servico-tablet");
   await applicant.close();
   await panel.setViewportSize({ width: 1440, height: 1000 });
   await panel.locator("#company-select").selectOption(fixtures.first.id);

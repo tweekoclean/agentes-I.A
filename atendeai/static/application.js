@@ -1,6 +1,9 @@
 (() => {
   "use strict";
-  const $ = (id) => document.getElementById(id);
+  const instances = new WeakMap();
+  function mount(root, options = {}) {
+  if (instances.has(root)) return instances.get(root);
+  const $ = (id) => root.querySelector("#" + id);
   const services = { atendimento_ia: "Atendimento com IA", criacao_site: "Criação de site", sistema: "Sistema sob medida", reformulacao_site: "Reformulação de site" };
   const selectedServices = () => Object.keys(services).filter((id) => $("apply-service-" + id).checked);
   const channels = () => $("apply-support-fields").disabled ? [] : [$("apply-whatsapp").checked ? "whatsapp" : "", $("apply-site").checked ? "site" : ""].filter(Boolean);
@@ -11,11 +14,11 @@
     $("apply-website-label").textContent = $("apply-website").required ? "Endereço do site que deseja reformular" : "Site atual (opcional)";
   }
   for (const id of Object.keys(services)) $("apply-service-" + id).addEventListener("change", updateServices);
-  const requested = new URLSearchParams(location.search).get("servico");
+  let requested = options.service || new URLSearchParams(location.search).get("servico");
   if (Object.hasOwn(services, requested)) $("apply-service-" + requested).checked = true;
   updateServices();
-  let step = 1, submitting = false;
-  const submissionId = crypto.randomUUID();
+  let step = 1, submitting = false, completed = false;
+  let submissionId = crypto.randomUUID();
   function error(message = "") { $("public-error").textContent = message; $("public-error").hidden = !message; }
   function validate(number) {
     const section = $("application-step-" + number);
@@ -42,7 +45,10 @@
       if (selectedServices().includes("atendimento_ia")) values.push(["Canais de atendimento", channels().map((id) => id === "whatsapp" ? "WhatsApp" : "Chat do site").join(" e ")], ["Conversas por dia", $("apply-volume").selectedOptions[0].textContent]);
       $("public-summary").replaceChildren(...values.map(([label, text]) => { const item = document.createElement("div"); item.className = "detail-item"; const title = document.createElement("span"); title.textContent = label; const content = document.createElement("p"); content.textContent = text; item.append(title, content); return item; }));
     }
-    $("application-step-" + number).querySelector("input,select,textarea")?.focus();
+    const section = $("application-step-" + number);
+    if (number === 3) { section.querySelector("h3").tabIndex = -1; section.querySelector("h3").focus(); }
+    else section.querySelector("input,select,textarea")?.focus();
+    root.closest?.("dialog")?.querySelector(".modal-body")?.scrollTo({ top: 0, behavior: "auto" });
   }
   $("application-next").addEventListener("click", () => { error(); if (validate(step)) showStep(step + 1); });
   $("application-back").addEventListener("click", () => { if (!submitting) showStep(step - 1); });
@@ -61,7 +67,8 @@
       const data = await response.json(); if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Confira os campos e tente novamente.");
       $("public-protocol").textContent = "Protocolo: " + data.protocolo;
       $("public-application-form").hidden = $("application-steps").hidden = $("application-intro").hidden = true;
-      $("public-success").hidden = false;
+      $("public-success").hidden = false; completed = true;
+      $("application-new-request").focus();
     } catch (failure) { error(failure.name === "AbortError" || failure instanceof TypeError ? "Não conseguimos confirmar o recebimento. Tente enviar novamente nesta página; sua solicitação não será duplicada." : failure.message); }
     finally { clearTimeout(timer); submitting = false; $("application-submit").disabled = $("application-back").disabled = false; $("application-submit").textContent = "Enviar solicitação →"; }
   });
@@ -74,5 +81,30 @@
       $("application-next").disabled = false;
     } catch { error("Não foi possível carregar o formulário. Atualize a página para tentar novamente."); }
   }
+  $("application-new-request").addEventListener("click", () => {
+    if (submitting) return;
+    $("public-application-form").reset();
+    completed = false; submissionId = crypto.randomUUID();
+    if (Object.hasOwn(services, requested)) $("apply-service-" + requested).checked = true;
+    updateServices();
+    $("public-application-form").hidden = $("application-steps").hidden = $("application-intro").hidden = false;
+    $("public-success").hidden = true;
+    showStep(1);
+  });
+  const instance = {
+    selectService(service) {
+      if (submitting || !Object.hasOwn(services, service)) return;
+      requested = service;
+      if (completed) return;
+      $("apply-service-" + service).checked = true; updateServices();
+      if (step === 3) showStep(2);
+    },
+    focus() { (completed ? $("application-new-request") : $("application-step-" + step).querySelector("input,select,textarea"))?.focus(); },
+  };
+  instances.set(root, instance);
   loadCatalog();
+  return instance;
+  }
+  window.NelvoApplication = { mount };
+  if (document.getElementById("public-application-form")) mount(document);
 })();

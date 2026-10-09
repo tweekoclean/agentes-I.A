@@ -27,18 +27,18 @@ jobs:
                   try:
                       response = client.get(base + "/")
                       response.raise_for_status()
-                      if response.json().get("versao") == "0.7.1":
+                      if response.json().get("versao") == "0.8.0":
                           break
                   except (httpx.HTTPError, ValueError):
                       pass
                   if attempt == 17:
-                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.7.1.")
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.8.0.")
                   time.sleep(5)
               health = client.get(base + "/health")
               health.raise_for_status()
               assert health.json()["status"] == "ok"
-              print("Versão 0.7.1 publicada; banco conectado.")
-              for route in ("/painel", "/painel/painel.css", "/painel/painel.js", "/aplicar", "/aplicar/formulario.js", "/marca.png", "/home/home.css", "/home/home.js"):
+              print("Versão 0.8.0 publicada; banco conectado.")
+              for route in ("/painel", "/painel/painel.css", "/painel/painel.js", "/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.png", "/home/home.css", "/home/home.js"):
                   panel = client.get(base + route)
                   panel.raise_for_status()
                   assert panel.headers.get("cache-control") == "no-store"
@@ -49,6 +49,11 @@ jobs:
               landing.raise_for_status()
               assert 'class="home-page"' in landing.text
               assert "Fale com um especialista" in landing.text
+              assert 'id="application-modal"' in landing.text
+              assert 'id="services-story"' in landing.text
+              form = client.get(base + "/aplicar/conteudo")
+              assert 'id="public-application-form"' in form.text
+              assert form.text in client.get(base + "/aplicar").text
               catalog = client.get(base + "/publico/aplicacoes/catalogo")
               catalog.raise_for_status()
               assert "RJ" in catalog.json()["estados"]

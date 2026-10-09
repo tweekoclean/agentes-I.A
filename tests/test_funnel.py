@@ -37,7 +37,7 @@ class FunnelTests(unittest.TestCase):
         return response.json()["protocolo"]
 
     def test_public_form_and_browser_root_with_api_compatibility(self):
-        for path in ("/aplicar", "/aplicar/formulario.js", "/marca.svg", "/home/home.css", "/home/home.js"):
+        for path in ("/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.svg", "/home/home.css", "/home/home.js"):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertNotIn(KEY, response.text)
@@ -50,13 +50,19 @@ class FunnelTests(unittest.TestCase):
         self.assertNotIn('id="public-application-form"', html.text)
         self.assertIn('href="/aplicar"', html.text)
         self.assertIn('src="/marca.png"', html.text)
+        self.assertIn('id="application-modal"', html.text)
+        self.assertIn('id="services-story"', html.text)
         self.assertIn('id="public-application-form"', self.client.get("/aplicar").text)
+        fragment = self.client.get("/aplicar/conteudo").text
+        self.assertIn(fragment, self.client.get("/aplicar").text)
+        self.assertNotIn("<!--APPLICATION_FORM-->", self.client.get("/aplicar").text)
+        self.assertEqual(fragment.count('id="public-application-form"'), 1)
         self.assertNotIn("SÃO PAULO", html.text + self.client.get("/aplicar").text)
         logo = self.client.get("/marca.png")
         self.assertEqual(logo.headers["content-type"], "image/png")
         self.assertTrue(logo.content.startswith(b"\x89PNG"))
         self.assertIn("Accept", html.headers["vary"])
-        self.assertEqual(self.client.get("/").json()["versao"], "0.7.1")
+        self.assertEqual(self.client.get("/").json()["versao"], "0.8.0")
 
     def test_public_submission_stores_application_without_customer_or_outreach(self):
         body = application(); identifier = self.submit(body)
