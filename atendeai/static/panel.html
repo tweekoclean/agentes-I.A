@@ -12,10 +12,10 @@
   <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
   <main id="login-screen" class="login-screen">
     <section class="login-story">
-      <a class="brand" href="/"><img src="/marca.svg" alt="Nelvo Company" width="180" height="59"></a>
+      <a class="brand logo-original" href="/"><img src="/marca.png" alt="Nelvo Company" width="180" height="59"></a>
       <div class="story-copy"><span class="eyebrow">SUA OPERAÇÃO. MAIS CLARA.</span>
         <h1>Da primeira conversa<br>ao próximo cliente.</h1>
-        <p>Encontre empresas, apresente o atendimento automático e acompanhe cada oportunidade de negócio.</p>
+        <p>Encontre empresas, apresente as soluções da Nelvo e acompanhe cada oportunidade de negócio.</p>
         <div class="story-note"><span class="status-dot" aria-hidden="true"></span>Automação com uma pessoa por perto.</div>
       </div>
       <p class="story-footer">Prospecção · Comercial · Atendimento dos clientes</p>
@@ -37,7 +37,7 @@
   <div id="app-screen" class="app-shell" hidden>
     <aside class="sidebar">
       <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="true" aria-label="Recolher menu" type="button">☰ Menu</button>
-      <a class="brand" href="/painel"><img src="/marca.svg" alt="Nelvo Company" width="170" height="56"></a>
+      <a class="brand logo-original" href="/painel"><img src="/marca.png" alt="Nelvo Company" width="170" height="56"></a>
       <p class="nav-label">OPERAÇÃO DA NELVO</p>
       <nav class="nav" aria-label="Operação comercial">
         <button class="nav-button active" data-view="dashboard" type="button"><span aria-hidden="true">◫</span>Visão geral</button>
@@ -53,19 +53,19 @@
         <button class="nav-button" data-view="knowledge" type="button"><span aria-hidden="true">▤</span>Base de respostas</button>
         <button class="nav-button" data-view="settings" type="button"><span aria-hidden="true">⚙</span>Configuração</button>
       </nav>
-      <div class="sidebar-bottom"><a href="/aplicar" target="_blank" rel="noopener noreferrer">Formulário de aplicação ↗</a><a href="/demonstracao" target="_blank" rel="noopener noreferrer">Testar atendimento ↗</a><a href="/docs" target="_blank" rel="noopener noreferrer">Documentação ↗</a><button id="logout" type="button">Sair do painel</button><small>Nelvo Company · 0.6.0</small></div>
+      <div class="sidebar-bottom"><a href="/" target="_blank" rel="noopener noreferrer">Home da Nelvo ↗</a><a href="/aplicar" target="_blank" rel="noopener noreferrer">Formulário de aplicação ↗</a><a href="/demonstracao" target="_blank" rel="noopener noreferrer">Testar atendimento ↗</a><a href="/docs" target="_blank" rel="noopener noreferrer">Documentação ↗</a><button id="logout" type="button">Sair do painel</button><small>Nelvo Company · 0.7.0</small></div>
     </aside>
     <main class="workspace">
       <header class="workspace-header"><div><span class="eyebrow" id="company-caption">SEU ESPAÇO DE ATENDIMENTO</span><h1 id="view-title">Atendimento</h1></div><div class="header-actions"><span class="private-badge"><span class="status-dot" aria-hidden="true"></span>Acesso administrativo</span><button id="refresh" class="button secondary" type="button">↻ Atualizar</button></div></header>
       <p id="load-error" class="inline-error" role="alert" hidden></p>
       <div id="nelvo-workspace">
         <section id="view-dashboard" class="view" hidden>
-          <div class="welcome-banner"><div><span class="eyebrow">COMERCIAL COM DIREÇÃO</span><h2>Cada oportunidade,<br>um próximo passo.</h2><p>A Nelvo oferece o atendimento automático. Aqui você acompanha quem pode se tornar cliente.</p><button class="button primary" data-open="research" type="button">Encontrar empresas →</button></div><div class="banner-art" aria-hidden="true"><span>01 · ENCONTRAR</span><span>02 · CONVERSAR</span><span>03 · IMPLANTAR</span></div></div>
+          <div class="welcome-banner"><div><span class="eyebrow">COMERCIAL COM DIREÇÃO</span><h2>Cada oportunidade,<br>um próximo passo.</h2><p>Sites, sistemas e atendimento com IA. Aqui você acompanha cada projeto da Nelvo, do primeiro contato à contratação.</p><button class="button primary" data-open="research" type="button">Encontrar empresas →</button></div><div class="banner-art" aria-hidden="true"><span>01 · ENCONTRAR</span><span>02 · CONVERSAR</span><span>03 · IMPLANTAR</span></div></div>
           <div class="metric-grid" id="dashboard-metrics"></div>
           <div class="dashboard-grid"><section class="card padded"><div class="card-heading"><h2>Seu funil comercial</h2><button class="button quiet" data-open="funnel" type="button">Ver funil →</button></div><div id="dashboard-stages" class="stage-summary"></div></section><section class="card padded"><span class="eyebrow">PRÓXIMOS PASSOS</span><h2>Prepare sua operação</h2><div id="dashboard-checklist" class="checklist"></div><a href="/aplicar" class="button secondary" target="_blank" rel="noopener noreferrer">Abrir aplicação pública ↗</a><button id="copy-application" class="button quiet" type="button">Copiar link para compartilhar</button></section></div>
         </section>
         <section id="view-research" class="view" hidden>
-          <div class="section-intro"><p>Sistema 1 · Encontre empresas de São Paulo e interior para oferecer o atendimento automático.</p></div>
+          <div class="section-intro"><p>Sistema 1 · Selecione uma cidade do catálogo de pesquisa e encontre novas oportunidades.</p></div>
           <form id="search-form" class="card padded search-form"><div><label for="search-city">Cidade</label><select id="search-city" required></select></div><div><label for="search-segment">Segmento</label><select id="search-segment" required></select></div><div><label for="search-limit">Quantidade máxima</label><select id="search-limit"><option value="30">30 empresas</option><option value="100">100 empresas</option><option value="200">200 empresas</option></select></div><button id="search-submit" class="button primary" type="submit">Buscar empresas →</button><p id="search-error" class="inline-error" role="alert" hidden></p></form>
           <div class="section-intro results-heading"><div><h2>Empresas encontradas</h2><p id="search-source">Selecione os filtros para pesquisar ou consultar empresas salvas.</p></div><button id="load-leads" class="button secondary" type="button">Consultar salvas</button></div><div id="lead-list" class="lead-list"></div><div class="pagination"><button id="leads-prev" class="button secondary" type="button">← Anterior</button><span id="leads-page" class="muted"></span><button id="leads-next" class="button secondary" type="button">Próxima →</button></div>
         </section>
@@ -75,7 +75,7 @@
           <p id="funnel-total" class="muted"></p><div id="funnel-board" class="funnel-board"></div><div class="pagination"><button id="funnel-prev" class="button secondary" type="button">← Anterior</button><span id="funnel-page" class="muted"></span><button id="funnel-next" class="button secondary" type="button">Próxima →</button></div>
         </section>
         <section id="view-commercial" class="view" hidden>
-          <div class="section-intro"><p>Sistema 2 · A Nelvo apresenta o atendimento automático às empresas e conversa sobre o serviço.</p></div>
+          <div class="section-intro"><p>Sistema 2 · Abordagem automatizada do atendimento com IA. Projetos de sites e sistemas são acompanhados no funil.</p></div>
           <div id="commercial-status" class="card padded"></div>
           <div class="section-intro results-heading"><div><h2>Abordagens e mensagens</h2><p>Crie a abordagem na pesquisa. Revise aqui e acompanhe o envio.</p></div><label class="visually-hidden" for="commercial-filter">Filtrar mensagens comerciais</label><select id="commercial-filter"><option value="">Todas as mensagens</option><option value="rascunho">Rascunhos</option><option value="aprovada">Aprovadas</option><option value="na_fila">Na fila</option><option value="aceita">Aceitas pela Meta</option><option value="falhou">Falhas</option></select></div><div id="commercial-messages" class="commercial-messages"></div><div class="pagination"><button id="commercial-prev" class="button secondary" type="button">← Anterior</button><span id="commercial-page" class="muted"></span><button id="commercial-next" class="button secondary" type="button">Próxima →</button></div><h2 class="section-title">Conversas comerciais</h2><div id="commercial-conversations" class="lead-list"></div><div class="pagination"><button id="sales-prev" class="button secondary" type="button">← Anterior</button><span id="sales-page" class="muted"></span><button id="sales-next" class="button secondary" type="button">Próxima →</button></div>
         </section>

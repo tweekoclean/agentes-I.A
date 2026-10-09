@@ -1,13 +1,15 @@
 """Funil persistente, aplicação pública limitada e cadastro explícito do serviço vendido."""
 import unittest
+from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import create_engine, func, inspect, select
+from sqlalchemy.orm import Session
 
 from atendeai.api import create_app
 from atendeai.config import Settings
-from atendeai.models import ApplicationRate, Lead, SalesApplication, SupportTenant
+from atendeai.models import ApplicationProject, ApplicationRate, Base, Lead, SalesApplication, SupportTenant
 
 KEY = "funnel-test-admin-key-no-production-secret"
 HEADERS = {"X-API-Key": KEY}
@@ -35,7 +37,7 @@ class FunnelTests(unittest.TestCase):
         return response.json()["protocolo"]
 
     def test_public_form_and_browser_root_with_api_compatibility(self):
-        for path in ("/aplicar", "/aplicar/formulario.js", "/marca.svg"):
+        for path in ("/aplicar", "/aplicar/formulario.js", "/marca.svg", "/home/home.css", "/home/home.js"):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertNotIn(KEY, response.text)
@@ -44,8 +46,17 @@ class FunnelTests(unittest.TestCase):
         html = self.client.get("/", headers={"Accept": "text/html"})
         self.assertIn("text/html", html.headers["content-type"])
         self.assertIn("Nelvo", html.text)
+        self.assertIn('class="home-page"', html.text)
+        self.assertNotIn('id="public-application-form"', html.text)
+        self.assertIn('href="/aplicar"', html.text)
+        self.assertIn('src="/marca.png"', html.text)
+        self.assertIn('id="public-application-form"', self.client.get("/aplicar").text)
+        self.assertNotIn("SÃO PAULO", html.text + self.client.get("/aplicar").text)
+        logo = self.client.get("/marca.png")
+        self.assertEqual(logo.headers["content-type"], "image/png")
+        self.assertTrue(logo.content.startswith(b"\x89PNG"))
         self.assertIn("Accept", html.headers["vary"])
-        self.assertEqual(self.client.get("/").json()["versao"], "0.6.0")
+        self.assertEqual(self.client.get("/").json()["versao"], "0.7.0")
 
     def test_public_submission_stores_application_without_customer_or_outreach(self):
         body = application(); identifier = self.submit(body)
@@ -63,14 +74,80 @@ class FunnelTests(unittest.TestCase):
         self.assertEqual(self.client.get("/v1/comercial/mensagens", headers=HEADERS).json()["mensagens"], [])
 
     def test_invalid_fields_scope_and_contact_permission(self):
-        for change in ({"autoriza_contato": False}, {"cidade": "Rio de Janeiro"}, {"segmento": "invalido"},
+        for change in ({"autoriza_contato": False}, {"cidade": " "}, {"uf": "ZZ"}, {"segmento": "invalido"},
                        {"whatsapp": "12345"}, {"nome_empresa": "  "}, {"objetivo": " " * 30},
-                       {"canais": []}, {"canais": ["email"]}, {"site_extra": "spam"}, {"extra": "field"}):
+                       {"canais": []}, {"canais": ["email"]}, {"servicos": []}, {"servicos": ["invalido"]},
+                       {"servicos": ["reformulacao_site"]}, {"site_atual": "javascript:alert(1)"},
+                       {"site_atual": "https://user:password@example.com"}, {"site_extra": "spam"}, {"extra": "field"}):
             response = self.client.post("/publico/aplicacoes", json=application(**change))
             self.assertEqual(response.status_code, 422, change)
         self.assertEqual(self.client.post("/publico/aplicacoes", json=application(), headers={"Origin": "https://other.invalid"}).status_code, 403)
         self.assertEqual(self.client.post("/publico/aplicacoes", content="x" * 17000, headers={"Content-Type": "application/json"}).status_code, 413)
         self.assertEqual(self.client.post("/publico/aplicacoes", content="text").status_code, 415)
+
+    def test_nationwide_project_without_support_and_customer_conversion_guard(self):
+        identifier = self.submit(application(cidade="Rio de Janeiro", uf="RJ", segmento="outro",
+            servicos=["criacao_site", "sistema"], canais=[], objetivo="Criar um site e organizar os processos financeiros."))
+        row = self.client.get("/v1/funil", headers=HEADERS).json()["aplicacoes"][0]
+        self.assertEqual(row["servicos"], ["criacao_site", "sistema"])
+        self.assertEqual(row["uf"], "RJ")
+        self.assertEqual(row["canais"], [])
+        self.assertEqual(row["volume"], "nao_informado")
+        self.assertFalse(row["abordagem_disponivel"])
+        path = "/v1/funil/" + identifier
+        self.client.patch(path, headers=HEADERS, json={"etapa": "ganha", "notas": "Entregar site e sistema financeiro."}).raise_for_status()
+        self.assertEqual(self.client.post(path + "/cliente", headers=HEADERS, json={"nome": "Projeto web"}).status_code, 409)
+        self.assertEqual(self.client.post(path + "/empresa", headers=HEADERS).status_code, 409)
+        with self.app.state.sessions() as session:
+            self.assertEqual(session.scalar(select(func.count()).select_from(ApplicationProject)), 1)
+            self.assertEqual(session.scalar(select(func.count()).select_from(SupportTenant)), 0)
+
+    def test_reformulation_stores_website_and_multiple_services(self):
+        body = application(cidade="Curitiba", uf="PR", servicos=["reformulacao_site", "atendimento_ia"],
+                           site_atual="https://empresa.example.invalid/servicos")
+        identifier = self.submit(body)
+        self.assertEqual(self.submit(body), identifier)
+        row = self.client.get("/v1/funil", headers=HEADERS).json()["aplicacoes"][0]
+        self.assertEqual(row["site_atual"], body["site_atual"])
+        self.assertEqual(row["servicos"], body["servicos"])
+        self.assertFalse(row["abordagem_disponivel"])
+        path = "/v1/funil/" + identifier
+        self.client.patch(path, headers=HEADERS, json={"etapa": "ganha"}).raise_for_status()
+        self.assertEqual(self.client.post(path + "/cliente", headers=HEADERS, json={"nome": "Cliente de Curitiba"}).status_code, 200)
+
+    def test_legacy_research_application_retains_support_behavior(self):
+        with self.app.state.sessions() as session:
+            session.add(SalesApplication(name="Empresa antiga", city="Campinas", segment="servicos", channels=["whatsapp"]))
+            session.commit()
+        row = self.client.get("/v1/funil", headers=HEADERS).json()["aplicacoes"][0]
+        self.assertEqual(row["servicos"], ["atendimento_ia"])
+        self.assertEqual(row["uf"], "SP")
+        self.assertTrue(row["abordagem_disponivel"])
+        catalog = self.client.get("/publico/aplicacoes/catalogo").json()
+        self.assertEqual(len(catalog["estados"]), 27)
+        self.assertEqual(len(catalog["servicos"]), 4)
+        self.assertNotIn("cidades", catalog)
+        self.assertEqual(len(self.client.get("/v1/cidades", headers=HEADERS).json()["cidades"]), 20)
+
+    def test_upgrade_creates_project_table_and_preserves_existing_applications(self):
+        with TemporaryDirectory() as directory:
+            url = f"sqlite:///{directory}/legacy.db"
+            engine = create_engine(url)
+            Base.metadata.create_all(engine, tables=[table for table in Base.metadata.sorted_tables if table.name != "application_projects"])
+            old_columns = [column["name"] for column in inspect(engine).get_columns("sales_applications")]
+            with Session(engine) as session:
+                session.add(SalesApplication(name="Cliente da versão anterior", city="Campinas", segment="restaurantes", channels=["whatsapp"]))
+                session.commit()
+            updated = create_app(Settings(environment="test", database_url=url, admin_api_key=KEY))
+            with TestClient(updated) as client:
+                rows = client.get("/v1/funil", headers=HEADERS).json()["aplicacoes"]
+                self.assertEqual(rows[0]["nome_empresa"], "Cliente da versão anterior")
+                self.assertEqual(rows[0]["servicos"], ["atendimento_ia"])
+                response = client.post("/publico/aplicacoes", json=application(cidade="Salvador", uf="BA", servicos=["sistema"], canais=[]))
+                self.assertEqual(response.status_code, 201)
+            self.assertEqual([column["name"] for column in inspect(engine).get_columns("sales_applications")], old_columns)
+            self.assertIn("application_projects", inspect(engine).get_table_names())
+            engine.dispose()
 
     def test_submission_cap_and_idempotent_retry(self):
         body = application(); identifier = self.submit(body)

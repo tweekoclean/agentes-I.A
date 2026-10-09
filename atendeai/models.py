@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 import uuid
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, create_engine, event
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
@@ -43,6 +43,17 @@ class SalesApplication(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    project: Mapped["ApplicationProject | None"] = relationship(
+        lazy="selectin", uselist=False, cascade="all, delete-orphan")
+
+
+class ApplicationProject(Base):
+    """Detalhes adicionais; tabela nova preserva aplicações de versões anteriores."""
+    __tablename__ = "application_projects"
+    application_id: Mapped[str] = mapped_column(ForeignKey("sales_applications.id"), primary_key=True)
+    services: Mapped[list] = mapped_column(JSON)
+    state: Mapped[str | None] = mapped_column(String(2))
+    website: Mapped[str] = mapped_column(String(500), default="")
 
 
 class ApplicationRate(Base):

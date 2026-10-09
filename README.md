@@ -1,6 +1,6 @@
-# Nelvo Company — central comercial e atendimento, versão 0.6.0
+# Nelvo Company — soluções digitais e central comercial, versão 0.7.0
 
-**A Nelvo Company apresenta e vende o atendimento automático.** Os sistemas 1 (pesquisa) e 2 (abordagem comercial) são usados na operação interna; o sistema 3 é o serviço implantado nas empresas clientes. Consulte [PRODUTO.md](PRODUTO.md) para os fluxos do atendimento.
+**A Nelvo Company oferece criação de sites, sistemas sob medida, reformulação de sites e atendimento com IA.** Os sistemas 1 (pesquisa) e 2 (abordagem comercial) são usados na operação interna; o sistema 3 é o serviço implantado nas empresas clientes. Consulte [PRODUTO.md](PRODUTO.md) para os fluxos do atendimento.
 
 Plataforma organizada em três módulos:
 
@@ -23,11 +23,14 @@ O painel abre na **Visão geral**, com números reais da operação. A navegaç�
 - **Buscar empresas:** pesquisar por cidade, segmento e quantidade; consultar dados salvos, fonte, revisão e autorização de contato. Dados de demonstração aparecem identificados e não entram no funil real.
 - **Comercial WhatsApp:** criar e revisar abordagens com a marca Nelvo Company, aprovar/descartar, enfileirar quando a conta estiver configurada, acompanhar status de entrega e consultar/pausar conversas comerciais. Preparar um rascunho não envia mensagens.
 - **Funil de aplicação:** acompanhar Novas → Qualificação → Demonstração → Proposta → Contratadas, com arquivamento, busca, filtros, paginação e anotações. Empresas pesquisadas podem ser adicionadas ao funil.
-- **Aplicação pública:** [formulário em /aplicar](https://atendeai-co.squareweb.app/aplicar), em três etapas: empresa, atendimento e confirmação. O visitante informa canal, volume e necessidade, autoriza o contato e recebe um protocolo. A página inicial mostra o formulário em navegadores e mantém a resposta JSON para clientes da API.
+- **Home pública:** `/` apresenta os quatro serviços, a empresa, o processo e dúvidas frequentes, com a logo original enviada pelo proprietário. Os botões **Fale com um especialista** levam ao formulário separado. Links de serviço usam `/aplicar?servico=criacao_site` (ou `atendimento_ia`, `sistema`, `reformulacao_site`) para pré-selecionar o interesse. O JSON na raiz continua disponível aos clientes da API.
+- **Aplicação pública:** `/aplicar`, em três etapas: empresa, projeto e confirmação. Aceita cidades de todo o Brasil com estado, segmento, um ou mais serviços e objetivo. Canal e volume aparecem apenas para atendimento com IA; o endereço atual é obrigatório para reformulação. A autorização refere-se aos serviços selecionados, e o envio gera um protocolo.
+
+Os serviços escolhidos, a UF e o site atual ficam na tabela adicional `application_projects`, criada automaticamente sem alterar a tabela de aplicações existente. Registros antigos continuam classificados como atendimento com IA. A abordagem automatizada existente continua específica do atendimento com IA e do catálogo interno; projetos de outros serviços ou localidades recebem acompanhamento direto no funil.
 
 As aplicações persistem no PostgreSQL e só são listadas nas rotas administrativas `/v1/funil`. O formulário limita tamanho e frequência, rejeita campos inválidos e usa um identificador de envio para impedir duplicação em tentativas repetidas. Limites iniciais: cinco aplicações por telefone/conexão por hora e cem por dia na plataforma. A declaração de autorização é registrada na aplicação; antes de enviar uma abordagem, o operador confirma o contato e registra a evidência verificável na empresa comercial. O formulário não cria automaticamente um cliente nem envia mensagens.
 
-Após confirmar a contratação, salve a etapa **Contratada** e use **Cadastrar como cliente**. Cadastro e vínculo são gravados na mesma transação; repetir a ação recupera o mesmo cliente. Configure então o sistema 3 para aquela empresa. A Nelvo não precisa ser cadastrada como cliente para utilizar pesquisa ou abordagem comercial.
+Para projetos que incluem atendimento com IA, após confirmar a contratação, salve a etapa **Contratada** e use **Implantar atendimento**. Projetos exclusivamente de sites e sistemas são acompanhados nas etapas e notas do funil, sem criar um espaço de atendimento. Cadastro e vínculo são gravados na mesma transação; repetir a ação recupera o mesmo cliente. Configure então o sistema 3 para aquela empresa. A Nelvo não precisa ser cadastrada como cliente para utilizar pesquisa ou abordagem comercial.
 
 Na área de empresas clientes, selecione a empresa e use:
 
@@ -46,7 +49,7 @@ Os certificados, a conexão PostgreSQL e as credenciais dos provedores continuam
 
 Fonte inicial: OpenStreetMap consultado pela API Overpass. Nenhuma chave paga é necessária para testar essa fonte. Há cache por cidade, segmentos, limite e provedor. Chamadas não atendidas pelo cache respeitam um intervalo global registrado no banco; não são disparadas em massa.
 
-O catálogo inicial contém **20 municípios**, com códigos conferidos na API oficial do IBGE: São Paulo, Campinas, Sorocaba, Ribeirão Preto, São José do Rio Preto, Jundiaí, Bauru, Piracicaba, São José dos Campos, Taubaté, Araraquara, Franca, Presidente Prudente, Marília, Americana, Limeira, Indaiatuba, Itu, Botucatu e São Carlos. Litoral e outros estados não são aceitos. Mais municípios podem ser adicionados ao catálogo após verificar o código e a localização.
+O catálogo inicial contém **20 municípios**, com códigos conferidos na API oficial do IBGE: São Paulo, Campinas, Sorocaba, Ribeirão Preto, São José do Rio Preto, Jundiaí, Bauru, Piracicaba, São José dos Campos, Taubaté, Araraquara, Franca, Presidente Prudente, Marília, Americana, Limeira, Indaiatuba, Itu, Botucatu e São Carlos. Esse limite pertence à ferramenta interna de pesquisa; o formulário público aceita solicitações de todos os estados brasileiros. Mais municípios podem ser adicionados ao catálogo após verificar o código e a localização.
 
 Sete segmentos: restaurantes, lojas, oficinas, beleza, serviços, academias e hospedagem. São categorias amplas para iniciar a busca, não todos os setores econômicos existentes.
 

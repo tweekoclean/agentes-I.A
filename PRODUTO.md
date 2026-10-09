@@ -1,12 +1,14 @@
-# Operação da Nelvo Company e serviço de atendimento
+# Nelvo Company: serviços digitais e operação comercial
 
 | Sistema | Quem usa | Função |
 | --- | --- | --- |
 | 1 — Pesquisa | Operação interna da Nelvo | Encontrar empresas em São Paulo e interior, guardar contatos públicos e preparar oportunidades comerciais. |
-| 2 — Comercial | Nelvo Company | Apresentar e oferecer o sistema 3 pelo número comercial da Nelvo e conversar com os contatos aptos à abordagem. |
+| 2 — Comercial | Nelvo Company | Abordagem automatizada atual: apresentar e oferecer o sistema 3 pelo número comercial da Nelvo e conversar com os contatos aptos à abordagem. |
 | 3 — Atendimento | Empresas contratantes | Atender os clientes da própria empresa pelo site/API e WhatsApp, com fatos e histórico separados por empresa. |
 
-A Nelvo apresenta e vende o serviço. A pesquisa e a abordagem são ferramentas internas; a integração distribuída à empresa contratante é somente o sistema 3. A Nelvo não precisa ser cadastrada como uma empresa cliente para fazer prospecção. O cliente não recebe a chave administrativa que acessa pesquisa, prospecção ou outras empresas.
+A Nelvo oferece atendimento com IA, criação de sites, sistemas sob medida e reformulação de sites. A home apresenta essas quatro soluções e direciona para `/aplicar`. O formulário aceita solicitações de todo o Brasil e registra os serviços, a UF, o site atual e o objetivo no funil comercial. O atendimento é o sistema 3; projetos de sites e sistemas possuem acompanhamento comercial próprio, sem criar automaticamente um cadastro de atendimento.
+
+A Nelvo apresenta e vende os serviços. A pesquisa e a abordagem são ferramentas internas; a integração distribuída à empresa contratante é somente o sistema 3. A Nelvo não precisa ser cadastrada como uma empresa cliente para fazer prospecção. O cliente não recebe a chave administrativa que acessa pesquisa, prospecção ou outras empresas.
 
 O sistema 2 envia pela fila após configuração do WhatsApp comercial, aprovação e autorização do contato. Encontrar um telefone público não libera automaticamente o envio. Os trabalhadores processam os envios e as respostas; as permissões existentes continuam sendo verificadas. A operação exige conectar a conta oficial. Um cadastro de oportunidade comercial e um cadastro de cliente de atendimento são entidades separadas.
 

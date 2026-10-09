@@ -1,4 +1,4 @@
--- Nelvo Company 0.6.0: criar em um banco vazio, uma única vez.
+-- Nelvo Company 0.7.0: criar em um banco vazio, uma única vez.
 
 CREATE TABLE application_rates (
 	key VARCHAR(100) NOT NULL,
@@ -233,6 +233,18 @@ CREATE TABLE support_quotas (
 ;
 
 
+CREATE TABLE application_projects (
+	application_id VARCHAR(36) NOT NULL,
+	services JSON NOT NULL,
+	state VARCHAR(2),
+	website VARCHAR(500) NOT NULL,
+	PRIMARY KEY (application_id),
+	FOREIGN KEY(application_id) REFERENCES sales_applications (id)
+)
+
+;
+
+
 CREATE TABLE commercial_handoffs (
 	id VARCHAR(36) NOT NULL,
 	conversation_id VARCHAR(36) NOT NULL,
@@ -335,8 +347,6 @@ CREATE TABLE support_messages (
 
 CREATE INDEX ix_application_rates_expires_at ON application_rates (expires_at);
 
-CREATE INDEX ix_leads_city ON leads (city);
-
 CREATE INDEX ix_leads_review_status ON leads (review_status);
 
 CREATE INDEX ix_leads_segment ON leads (segment);
@@ -344,6 +354,8 @@ CREATE INDEX ix_leads_segment ON leads (segment);
 CREATE INDEX ix_leads_consent_status ON leads (consent_status);
 
 CREATE INDEX ix_leads_is_demo ON leads (is_demo);
+
+CREATE INDEX ix_leads_city ON leads (city);
 
 CREATE INDEX ix_whatsapp_status_events_provider_message_id ON whatsapp_status_events (provider_message_id);
 
@@ -359,9 +371,9 @@ CREATE INDEX ix_support_conversations_tenant_id ON support_conversations (tenant
 
 CREATE INDEX ix_support_knowledge_tenant_id ON support_knowledge (tenant_id);
 
-CREATE INDEX ix_commercial_handoffs_conversation_id ON commercial_handoffs (conversation_id);
-
 CREATE INDEX ix_commercial_handoffs_status ON commercial_handoffs (status);
+
+CREATE INDEX ix_commercial_handoffs_conversation_id ON commercial_handoffs (conversation_id);
 
 CREATE INDEX ix_commercial_messages_status ON commercial_messages (status);
 

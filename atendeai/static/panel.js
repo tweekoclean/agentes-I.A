@@ -580,7 +580,8 @@
   }
   async function loadCatalog() {
     if (state.catalog) return;
-    state.catalog = await api("/publico/aplicacoes/catalogo");
+    const [cities, segments] = await Promise.all([api("/v1/cidades"), api("/v1/segmentos")]);
+    state.catalog = { cidades: cities.cidades.map((city) => city.nome), segmentos: segments.segmentos.map((segment) => ({ id: segment.id, nome: segment.descricao })) };
     $("search-city").replaceChildren(...state.catalog.cidades.map((city) => { const option = node("option", "", city); option.value = city; return option; }));
     $("search-city").value = "Campinas";
     $("search-segment").replaceChildren(...state.catalog.segmentos.map((segment) => { const option = node("option", "", segment.nome); option.value = segment.id; return option; }));
@@ -630,27 +631,32 @@
       const header = node("header"); header.append(node("h2", "", title), node("span", "count", entries.length)); column.append(header);
       for (const item of entries) {
         const card = node("button", "application-card"); card.type = "button";
-        card.append(node("span", "badge " + (item.origem === "aplicacao" ? "blue" : "gray"), item.origem === "aplicacao" ? "Aplicação recebida" : "Pesquisa"), node("h3", "", item.nome_empresa), node("p", "", item.cidade + " · " + item.segmento), node("p", "", item.nome_contato || "Contato a confirmar"), node("small", "", "Atualizada " + date(item.atualizada_em)));
+        card.append(node("span", "badge " + (item.origem === "aplicacao" ? "blue" : "gray"), item.origem === "aplicacao" ? "Aplicação recebida" : "Pesquisa"), node("h3", "", item.nome_empresa), node("p", "", item.cidade + " / " + (item.uf || "SP") + " · " + item.segmento), node("p", "", item.servicos.map(serviceName).join(" · ")), node("p", "", item.nome_contato || "Contato a confirmar"), node("small", "", "Atualizada " + date(item.atualizada_em)));
         card.addEventListener("click", () => openApplication(item)); column.append(card);
       }
       if (!entries.length) column.append(node("p", "column-empty", "Nenhuma oportunidade nesta página"));
       return column;
     }));
   }
+  function serviceName(id) { return ({ atendimento_ia: "Atendimento com IA", criacao_site: "Criação de site", sistema: "Sistema sob medida", reformulacao_site: "Reformulação de site" })[id] || id; }
   function openApplication(item) {
     state.application = item;
     $("application-name").textContent = item.nome_empresa; $("application-origin").textContent = item.origem === "aplicacao" ? "APLICAÇÃO PÚBLICA" : "EMPRESA DA PESQUISA";
-    details($("application-details"), [["Cidade / segmento", item.cidade + " · " + item.segmento], ["Responsável", item.nome_contato], ["WhatsApp", item.whatsapp], ["Canais", item.canais.map(channelName).join(" e ")], ["Volume", volumes[item.volume]], ["Necessidade", item.objetivo], ["Autorização declarada no formulário", item.autoriza_contato ? "Autorizou contato sobre o serviço. Verifique o responsável antes de registrar a autorização de envio comercial." : "Não registrada"]]);
-    const contact = action("Revisar contato e preparar abordagem", async () => {
+    const includesSupport = item.servicos.includes("atendimento_ia");
+    details($("application-details"), [["Cidade / segmento", item.cidade + " / " + (item.uf || "SP") + " · " + item.segmento], ["Serviços solicitados", item.servicos.map(serviceName).join(" · ")], ["Responsável", item.nome_contato], ["WhatsApp", item.whatsapp], ["Site atual", item.site_atual || "Não informado"], ...(includesSupport ? [["Canais de atendimento", item.canais.map(channelName).join(" e ")], ["Volume", volumes[item.volume]]] : []), ["Necessidade", item.objetivo], ["Autorização declarada no formulário", item.autoriza_contato ? "Autorizou contato sobre os serviços selecionados. Confira o responsável antes de registrar uma autorização de envio comercial." : "Não registrada"]]);
+    if (item.abordagem_disponivel || item.empresa_id) {
+    const contact = action("Revisar contato e preparar abordagem de atendimento", async () => {
       const result = await api("/v1/funil/" + item.id + "/empresa", { method: "POST" });
       $("funnel-dialog").close(); await openLead(result.empresa_id);
     });
     $("application-details").append(contact);
+    } else $("application-details").append(node("p", "field-help", "Use o contato informado e registre a conversa, proposta e entrega nas notas deste projeto."));
     $("application-stage").value = item.etapa; $("application-notes").value = item.notas;
     $("application-stage").disabled = Boolean(item.cliente_id);
-    $("application-convert").textContent = item.cliente_id ? "Abrir cliente" : "Cadastrar como cliente";
+    $("application-convert").hidden = !includesSupport;
+    $("application-convert").textContent = item.cliente_id ? "Abrir cliente" : "Implantar atendimento";
     $("application-convert").disabled = !item.cliente_id && item.etapa !== "ganha";
-    $("application-convert-help").textContent = item.cliente_id ? "O espaço deste cliente já foi criado." : "Salve a etapa Contratada para habilitar o cadastro do serviço. A conexão com WhatsApp é configurada depois.";
+    $("application-convert-help").textContent = !includesSupport ? "Projeto de site ou sistema: acompanhe a contratação e a entrega nas etapas e notas do funil." : (item.cliente_id ? "O espaço de atendimento deste cliente já foi criado." : "Salve a etapa Contratada para habilitar o espaço de atendimento. A conexão com WhatsApp é configurada depois.");
     inlineError("application-error"); if (!$("funnel-dialog").open) $("funnel-dialog").showModal();
   }
   async function loadCommercial() {

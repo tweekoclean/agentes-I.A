@@ -18,6 +18,10 @@ def application_page():
     return FileResponse(STATIC / "application.html", media_type="text/html", headers=HEADERS)
 
 
+def home_page():
+    return FileResponse(STATIC / "home.html", media_type="text/html", headers=HEADERS)
+
+
 def panel_router():
     router = APIRouter()
     static = Path(__file__).parent / "static"
@@ -44,6 +48,18 @@ def panel_router():
         return FileResponse(static / "panel.js", media_type="application/javascript", headers=headers)
 
     router.add_api_route("/aplicar", application_page, methods=["GET"], include_in_schema=False)
+
+    @router.get("/home/home.css", include_in_schema=False)
+    def home_stylesheet():
+        return FileResponse(STATIC / "home.css", media_type="text/css", headers=HEADERS)
+
+    @router.get("/home/home.js", include_in_schema=False)
+    def home_script():
+        return FileResponse(STATIC / "home.js", media_type="application/javascript", headers=HEADERS)
+
+    @router.get("/marca.png", include_in_schema=False)
+    def original_brand():
+        return FileResponse(STATIC / "nelvo-logo.png", media_type="image/png", headers=HEADERS)
 
     @router.get("/aplicar/formulario.js", include_in_schema=False)
     def application_script():

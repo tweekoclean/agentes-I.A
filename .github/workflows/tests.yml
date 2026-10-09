@@ -20,6 +20,7 @@ jobs:
       - run: node --check atendeai/static/widget.js
       - run: node --check atendeai/static/panel.js
       - run: node --check atendeai/static/application.js
+      - run: node --check atendeai/static/home.js
       - run: python manage.py gerar-sql
   browser:
     runs-on: ubuntu-latest

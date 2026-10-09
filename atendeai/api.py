@@ -134,8 +134,8 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
                 engine.dispose()
                 ssl_files.close()
 
-    app = FastAPI(title="Nelvo Company — Comercial e Atendimento", version="0.6.0", lifespan=lifespan,
-                  description="Pesquisa em São Paulo, conversa comercial e suporte por empresa via site e WhatsApp oficial. O painel está em /painel. Use Authorize com ADMIN_API_KEY nas rotas administrativas; visitantes usam tokens próprios.")
+    app = FastAPI(title="Nelvo Company — Soluções digitais", version="0.7.0", lifespan=lifespan,
+                  description="Home e aplicações de projetos digitais, central comercial e suporte por empresa via site e WhatsApp oficial. O painel está em /painel. Use Authorize com ADMIN_API_KEY nas rotas administrativas; visitantes usam tokens próprios.")
     app.state.settings, app.state.engine, app.state.sessions = settings, engine, sessions
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
                        allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "X-Site-Key"])
@@ -193,11 +193,11 @@ def create_app(settings=None, source=None, ai_transport=None, whatsapp_transport
     @app.get("/", tags=["Informações"])
     def index(request: Request):
         if "text/html" in request.headers.get("accept", ""):
-            from .panel_routes import application_page
-            response = application_page()
+            from .panel_routes import home_page
+            response = home_page()
             response.headers["Vary"] = "Accept"
             return response
-        return JSONResponse({"projeto": "Nelvo Company", "versao": "0.6.0", "documentacao": "/docs", "painel": "/painel", "aplicacao": "/aplicar",
+        return JSONResponse({"projeto": "Nelvo Company", "versao": "0.7.0", "documentacao": "/docs", "painel": "/painel", "aplicacao": "/aplicar",
                 "agentes": {"1_pesquisa": "implementado", "2_comercial": "implementado" if settings.whatsapp_ready else "implementado_configuracao_pendente",
                             "3_atendimento": "implementado"},
                 "fonte_configurada": source.name, "envio_whatsapp_ativo": settings.whatsapp_ready}, headers={"Vary": "Accept", "Cache-Control": "no-store"})

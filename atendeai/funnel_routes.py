@@ -8,12 +8,12 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from .catalog import CITIES, SEGMENTS, resolve_city
-from .models import (ApplicationRate, Lead, SalesApplication, SupportHandoff,
+from .catalog import SEGMENTS, resolve_city
+from .models import (ApplicationProject, ApplicationRate, Lead, SalesApplication, SupportHandoff,
                      SupportTenant, as_utc, utcnow)
 from .service import db_insert
 from .sources import normalize_phone
@@ -23,6 +23,12 @@ from .support_routes import TenantCreate
 STAGES = {"nova": "Novas", "qualificacao": "Qualificação", "demonstracao": "Demonstração",
           "proposta": "Proposta", "ganha": "Contratadas", "perdida": "Arquivadas"}
 Stage = Literal["nova", "qualificacao", "demonstracao", "proposta", "ganha", "perdida"]
+SERVICES = {"atendimento_ia": "Atendimento com IA", "criacao_site": "Criação de site",
+            "sistema": "Sistema sob medida", "reformulacao_site": "Reformulação de site"}
+STATES = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
+INDUSTRIES = {**{key: value["label"] for key, value in SEGMENTS.items()},
+              "ecommerce": "E-commerce", "educacao": "Educação", "industria": "Indústria",
+              "servicos_profissionais": "Serviços profissionais", "outro": "Outro segmento"}
 
 
 class ApplicationBody(BaseModel):
@@ -30,24 +36,51 @@ class ApplicationBody(BaseModel):
     id_envio: UUID
     nome_empresa: str = Field(min_length=2, max_length=200)
     cidade: str = Field(min_length=2, max_length=100)
+    uf: str | None = None
+    servicos: list[Literal["atendimento_ia", "criacao_site", "sistema", "reformulacao_site"]] = Field(
+        default_factory=lambda: ["atendimento_ia"], min_length=1, max_length=4)
+    site_atual: str = Field(default="", max_length=500)
     segmento: str = Field(min_length=2, max_length=50)
     nome_contato: str = Field(min_length=2, max_length=150)
     whatsapp: str = Field(min_length=10, max_length=30)
-    canais: list[Literal["whatsapp", "site"]] = Field(min_length=1, max_length=2)
-    volume: Literal["ate_30", "31_100", "101_300", "mais_300", "nao_sei"]
+    canais: list[Literal["whatsapp", "site"]] = Field(default_factory=list, max_length=2)
+    volume: Literal["ate_30", "31_100", "101_300", "mais_300", "nao_sei"] = "nao_sei"
     objetivo: str = Field(min_length=10, max_length=2000)
     autoriza_contato: Literal[True]
     site_extra: str = Field(default="", max_length=200)
 
-    @field_validator("cidade")
+    @field_validator("uf")
     @classmethod
-    def city(cls, value):
-        return resolve_city(value).name
+    def state(cls, value):
+        if value is not None and value.upper() not in STATES:
+            raise ValueError("Selecione um estado brasileiro.")
+        return value.upper() if value else None
+
+    @field_validator("site_atual")
+    @classmethod
+    def website(cls, value):
+        if value:
+            parsed = urlsplit(value)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+                raise ValueError("Informe a URL pública do site, começando com https://.")
+        return value
+
+    @model_validator(mode="after")
+    def project_details(self):
+        # Compatibilidade com o formulário antigo, que só aceitava cidades do catálogo SP.
+        if self.uf is None:
+            self.cidade = resolve_city(self.cidade).name
+            self.uf = "SP"
+        if "atendimento_ia" in self.servicos and not self.canais:
+            raise ValueError("Escolha um canal para o atendimento com IA.")
+        if "reformulacao_site" in self.servicos and not self.site_atual:
+            raise ValueError("Informe o site que deseja reformular.")
+        return self
 
     @field_validator("segmento")
     @classmethod
     def segment(cls, value):
-        if value not in SEGMENTS:
+        if value not in INDUSTRIES:
             raise ValueError("Selecione um segmento disponível.")
         return value
 
@@ -72,8 +105,17 @@ class LeadBody(BaseModel):
 
 
 def application_data(row):
+    project = row.project
+    services = project.services if project else ["atendimento_ia"]
+    state = project.state if project else "SP"
+    try:
+        commercial_available = "atendimento_ia" in services and state == "SP" and row.segment in SEGMENTS and bool(resolve_city(row.city))
+    except ValueError:
+        commercial_available = False
     return {"id": row.id, "empresa_id": row.lead_id, "cliente_id": row.tenant_id,
             "nome_empresa": row.name, "cidade": row.city, "segmento": row.segment,
+            "uf": state, "servicos": services, "site_atual": project.website if project else "",
+            "abordagem_disponivel": commercial_available,
             "nome_contato": row.contact_name, "whatsapp": row.phone, "canais": row.channels,
             "volume": row.volume, "objetivo": row.goals, "autoriza_contato": row.contact_permission,
             "origem": row.source, "etapa": row.stage, "notas": row.notes,
@@ -91,12 +133,13 @@ def funnel_routers(sessions, settings, support, admin):
         return row
 
     def receipt(row):
-        return {"protocolo": row.id, "mensagem": "Aplicação recebida. A Nelvo vai analisar sua necessidade de atendimento."}
+        return {"protocolo": row.id, "mensagem": "Solicitação recebida. A Nelvo vai analisar seu projeto."}
 
     @public.get("/catalogo")
     def catalog():
-        return {"cidades": [city.name for city in CITIES.values()],
-                "segmentos": [{"id": key, "nome": value["label"]} for key, value in SEGMENTS.items()]}
+        return {"estados": STATES,
+                "servicos": [{"id": key, "nome": value} for key, value in SERVICES.items()],
+                "segmentos": [{"id": key, "nome": value} for key, value in INDUSTRIES.items()]}
 
     @public.post("", status_code=201)
     async def submit(request: Request):
@@ -137,8 +180,10 @@ def funnel_routers(sessions, settings, support, admin):
                         raise HTTPException(429, "Limite de aplicações atingido. Tente novamente mais tarde.")
                 row = SalesApplication(submission_id=str(body.id_envio), name=body.nome_empresa, city=body.cidade,
                     segment=body.segmento, contact_name=body.nome_contato, phone=body.whatsapp,
-                    channels=sorted(set(body.canais)), volume=body.volume, goals=body.objetivo,
+                    channels=sorted(set(body.canais)) if "atendimento_ia" in body.servicos else [],
+                    volume=body.volume if "atendimento_ia" in body.servicos else "nao_informado", goals=body.objetivo,
                     contact_permission=True, source="aplicacao")
+                row.project = ApplicationProject(services=list(dict.fromkeys(body.servicos)), state=body.uf, website=body.site_atual)
                 session.add(row)
                 session.commit()
                 return receipt(row)
@@ -206,6 +251,8 @@ def funnel_routers(sessions, settings, support, admin):
             row = get_application(session, identifier)
             if row.lead_id:
                 return {"empresa_id": row.lead_id}
+            if not application_data(row)["abordagem_disponivel"]:
+                raise HTTPException(409, "Esta solicitação deve ser acompanhada diretamente no funil. A abordagem automatizada atual é específica de atendimento e do catálogo de pesquisa.")
             city = resolve_city(row.city)
             lead = Lead(name=row.name, city=row.city, city_ibge=city.ibge_code, segment=row.segment,
                         phone_normalized=row.phone, source="aplicacao", source_ref=row.id,
@@ -226,6 +273,8 @@ def funnel_routers(sessions, settings, support, admin):
                 return {"empresa": support.tenant_data(session.get(SupportTenant, row.tenant_id)), "ja_cadastrada": True}
             if row.stage != "ganha":
                 raise HTTPException(409, "Marque a aplicação como contratada antes de criar o espaço do cliente.")
+            if "atendimento_ia" not in application_data(row)["servicos"]:
+                raise HTTPException(409, "Este projeto não inclui atendimento com IA. Acompanhe a entrega nas notas do funil.")
             key = secrets.token_urlsafe(32)
             tenant = SupportTenant(name=body.nome, allowed_origins=body.origens_permitidas, welcome_text=body.boas_vindas,
                 site_key_hash=digest(key), ai_enabled=body.ia_habilitada, daily_conversation_limit=body.limite_conversas_dia,
