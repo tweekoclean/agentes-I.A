@@ -4,6 +4,20 @@
   function mount(root, options = {}) {
   if (instances.has(root)) return instances.get(root);
   const $ = (id) => root.querySelector("#" + id);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const running = new Set();
+  reduced.addEventListener("change", () => { if (reduced.matches) for (const animation of running) animation.cancel(); });
+  function animate(element, frames, options = {}) {
+    if (!reduced.matches && element?.animate) {
+      const animation = element.animate(frames, { duration: 350, easing: "cubic-bezier(.2,.8,.2,1)", ...options });
+      running.add(animation);
+      animation.finished.catch(() => {}).finally(() => running.delete(animation));
+      return animation;
+    }
+  }
+  root.addEventListener("invalid", event => {
+    animate(event.target, [{ translate: "0" }, { translate: "-4px" }, { translate: "4px" }, { translate: "-2px" }, { translate: "0" }], { duration: 280 });
+  }, true);
   const services = { atendimento_ia: "Atendimento com IA", criacao_site: "Criação de site", sistema: "Sistema sob medida", reformulacao_site: "Reformulação de site" };
   const selectedServices = () => Object.keys(services).filter((id) => $("apply-service-" + id).checked);
   const channels = () => $("apply-support-fields").disabled ? [] : [$("apply-whatsapp").checked ? "whatsapp" : "", $("apply-site").checked ? "site" : ""].filter(Boolean);
@@ -19,7 +33,10 @@
   updateServices();
   let step = 1, submitting = false, completed = false;
   let submissionId = crypto.randomUUID();
-  function error(message = "") { $("public-error").textContent = message; $("public-error").hidden = !message; }
+  function error(message = "") {
+    $("public-error").textContent = message; $("public-error").hidden = !message;
+    if (message) animate($("public-error"), [{ opacity: 0, translate: "0 8px" }, { opacity: 1, translate: "0" }]);
+  }
   function validate(number) {
     const section = $("application-step-" + number);
     for (const input of section.querySelectorAll("input,select,textarea")) if (!input.reportValidity()) return false;
@@ -29,6 +46,7 @@
     return true;
   }
   function showStep(number) {
+    const direction = number >= step ? 1 : -1;
     step = number; error();
     for (let i = 1; i <= 3; i++) {
       $("application-step-" + i).hidden = i !== step;
@@ -39,6 +57,7 @@
     $("application-back").hidden = step === 1;
     $("application-next").hidden = step === 3; $("application-submit").hidden = step !== 3;
     $("application-step-label").textContent = "Passo " + step + " de 3";
+    $("application-steps").style.setProperty("--step-progress", ((step - 1) / 2) * 100 + "%");
     if (step === 3) {
       const values = [["Empresa", $("apply-company").value.trim()], ["Cidade / segmento", $("apply-city").value.trim() + " / " + $("apply-state").value + " · " + $("apply-segment").selectedOptions[0].textContent], ["Contato", $("apply-contact").value.trim() + " · " + $("apply-phone").value], ["Soluções", selectedServices().map((id) => services[id]).join(" · ")], ["Necessidade", $("apply-goal").value.trim()]];
       if ($("apply-website").value.trim()) values.push(["Site atual", $("apply-website").value.trim()]);
@@ -46,6 +65,7 @@
       $("public-summary").replaceChildren(...values.map(([label, text]) => { const item = document.createElement("div"); item.className = "detail-item"; const title = document.createElement("span"); title.textContent = label; const content = document.createElement("p"); content.textContent = text; item.append(title, content); return item; }));
     }
     const section = $("application-step-" + number);
+    animate(section, [{ opacity: 0, translate: direction * 26 + "px 0" }, { opacity: 1, translate: "0" }], { duration: 400 });
     if (number === 3) { section.querySelector("h3").tabIndex = -1; section.querySelector("h3").focus(); }
     else section.querySelector("input,select,textarea")?.focus();
     root.closest?.("dialog")?.querySelector(".modal-body")?.scrollTo({ top: 0, behavior: "auto" });
@@ -59,6 +79,7 @@
     if (step !== 3) { if (validate(step)) showStep(step + 1); return; }
     for (let number = 1; number <= 3; number++) { if (!validate(number)) { showStep(number); validate(number); return; } }
     submitting = true; $("application-submit").disabled = $("application-back").disabled = true;
+    $("public-application-form").classList.add("is-submitting");
     $("application-submit").textContent = "Enviando…"; error();
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 20000);
     try {
@@ -68,9 +89,10 @@
       $("public-protocol").textContent = "Protocolo: " + data.protocolo;
       $("public-application-form").hidden = $("application-steps").hidden = $("application-intro").hidden = true;
       $("public-success").hidden = false; completed = true;
+      animate($("public-success"), [{ opacity: 0, scale: .94, translate: "0 20px" }, { opacity: 1, scale: 1, translate: "0" }], { duration: 500 });
       $("application-new-request").focus();
     } catch (failure) { error(failure.name === "AbortError" || failure instanceof TypeError ? "Não conseguimos confirmar o recebimento. Tente enviar novamente nesta página; sua solicitação não será duplicada." : failure.message); }
-    finally { clearTimeout(timer); submitting = false; $("application-submit").disabled = $("application-back").disabled = false; $("application-submit").textContent = "Enviar solicitação →"; }
+    finally { clearTimeout(timer); submitting = false; $("public-application-form").classList.remove("is-submitting"); $("application-submit").disabled = $("application-back").disabled = false; $("application-submit").textContent = "Enviar solicitação →"; }
   });
   async function loadCatalog() {
     try {

@@ -22,7 +22,16 @@
     document.querySelectorAll("[data-theme-toggle]").forEach(button => button.addEventListener("click", () => {
       saved = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       try { localStorage.setItem("nelvo-theme", saved); } catch {}
-      apply(saved);
+      const next = saved;
+      if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const box = button.getBoundingClientRect();
+        document.documentElement.style.setProperty("--theme-x", box.left + box.width / 2 + "px");
+        document.documentElement.style.setProperty("--theme-y", box.top + box.height / 2 + "px");
+        try {
+          const transition = document.startViewTransition(() => apply(next));
+          transition.finished.catch(() => {});
+        } catch { apply(next); }
+      } else apply(next);
     }));
   });
   system.addEventListener("change", () => { if (!saved) apply(system.matches ? "dark" : "light"); });

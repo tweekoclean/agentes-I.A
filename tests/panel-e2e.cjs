@@ -90,12 +90,14 @@ async function scrollService(page, index, label) {
   await noOverflow(applicant, "Home desktop");
   assert.equal(Math.round((await applicant.locator(".site-header").boundingBox()).width), 1440, "Navbar acompanha toda a largura da página");
   await applicant.locator("[data-theme-toggle]").click();
+  await waitFor(async () => await applicant.locator("html").getAttribute("data-theme") === "dark", "transição para tema escuro");
   assert.equal(await applicant.locator("html").getAttribute("data-theme"), "dark");
   await applicant.reload();
   assert.equal(await applicant.locator("html").getAttribute("data-theme"), "dark", "Tema permanece após recarregar");
   assert.equal(await applicant.locator("[data-theme-toggle]").getAttribute("aria-label"), "Ativar tema claro");
   await applicant.screenshot({ path: path.join(output, "home-dark-desktop.png"), fullPage: true });
   await applicant.locator("[data-theme-toggle]").click();
+  await waitFor(async () => await applicant.locator("html").getAttribute("data-theme") === "light", "transição para tema claro");
   assert.equal(await applicant.locator("html").getAttribute("data-theme"), "light");
   assert.equal(await applicant.locator("#public-application-form").count(), 0, "Formulário carregado ao abrir o popup");
   assert.equal(await applicant.locator(".solution-card").count(), 4);
@@ -117,6 +119,7 @@ async function scrollService(page, index, label) {
   await applicant.screenshot({ path: path.join(output, "aplicacao-desktop.png") });
   await applicant.locator("#apply-company").fill('Pizzaria do Bairro <img src=x onerror="window.__xss=true">');
   await applicant.keyboard.press("Escape");
+  await applicant.locator("#application-modal").waitFor({ state: "hidden" });
   assert.equal(await applicant.locator("#application-modal").isVisible(), false);
   assert.equal(await applicant.locator(".hero-actions .cta").evaluate((el) => el === document.activeElement), true, "Foco volta ao botão");
   await applicant.locator(".hero-actions .cta").click();

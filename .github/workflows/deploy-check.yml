@@ -27,17 +27,17 @@ jobs:
                   try:
                       response = client.get(base + "/")
                       response.raise_for_status()
-                      if response.json().get("versao") == "0.10.1":
+                      if response.json().get("versao") == "0.11.0":
                           break
                   except (httpx.HTTPError, ValueError):
                       pass
                   if attempt == 17:
-                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.10.1.")
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.11.0.")
                   time.sleep(5)
               health = client.get(base + "/health")
               health.raise_for_status()
               assert health.json()["status"] == "ok"
-              print("Versão 0.10.1 publicada; banco conectado.")
+              print("Versão 0.11.0 publicada; banco conectado.")
               for route in ("/painel", "/painel/painel.css", "/painel/painel.js", "/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.png", "/home/home.css", "/home/home.js", "/home/tema.js"):
                   panel = client.get(base + route)
                   panel.raise_for_status()

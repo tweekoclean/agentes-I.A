@@ -2,12 +2,33 @@
   "use strict";
   const $ = (id) => document.getElementById(id);
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  document.documentElement.classList.add("nelvo-home");
+  const animations = new Set();
+  function motion(element, frames, options = {}) {
+    if (reduced.matches || !element?.animate) return null;
+    const animation = element.animate(frames, { duration: 360, easing: "cubic-bezier(.2,.8,.2,1)", ...options });
+    animations.add(animation);
+    animation.finished.catch(() => {}).finally(() => animations.delete(animation));
+    return animation;
+  }
   const compactHeight = window.matchMedia("(max-height: 640px)");
   const nav = $("home-nav");
-  const closeMenu = () => { nav.classList.remove("is-open"); $("home-menu-toggle").setAttribute("aria-expanded", "false"); };
+  let menuTimer;
+  const closeMenu = () => {
+    clearTimeout(menuTimer);
+    $("home-menu-toggle").setAttribute("aria-expanded", "false");
+    $("home-menu-toggle").querySelector("span").textContent = "☰";
+    const finish = () => { nav.classList.remove("is-open", "is-closing"); nav.inert = false; };
+    if (nav.classList.contains("is-open") && !reduced.matches && innerWidth <= 900) {
+      nav.inert = true; nav.classList.add("is-closing"); menuTimer = setTimeout(finish, 210);
+    } else finish();
+  };
   $("home-menu-toggle").addEventListener("click", () => {
     const open = $("home-menu-toggle").getAttribute("aria-expanded") !== "true";
-    $("home-menu-toggle").setAttribute("aria-expanded", String(open)); nav.classList.toggle("is-open", open);
+    if (!open) return closeMenu();
+    clearTimeout(menuTimer); nav.inert = false; nav.classList.remove("is-closing");
+    $("home-menu-toggle").setAttribute("aria-expanded", "true"); nav.classList.add("is-open");
+    $("home-menu-toggle").querySelector("span").textContent = "×";
   });
   nav.addEventListener("click", (event) => { if (event.target.closest("a")) closeMenu(); });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
@@ -15,7 +36,17 @@
 
   // Um único formulário compartilhado com /aplicar, sem iframe ou cópias dos campos.
   const modal = $("application-modal");
-  let opener, form, loading, requestedService;
+  let opener, form, loading, requestedService, closing;
+  function closeForm() {
+    if (!modal.open || closing) return closing;
+    modal.classList.add("is-closing");
+    closing = (async () => {
+      const animation = motion(modal, [{ opacity: 1, transform: "translateY(0) scale(1)" }, { opacity: 0, transform: "translateY(28px) scale(.96)" }], { duration: 260 });
+      if (animation) await animation.finished.catch(() => {});
+      modal.close(); modal.classList.remove("is-closing");
+    })().finally(() => { closing = null; });
+    return closing;
+  }
   async function loadForm() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -26,9 +57,11 @@
       if (!fragment?.querySelector("#public-application-form")) throw new Error("Formulário indisponível.");
       $("application-modal-body").replaceChildren(document.importNode(fragment, true));
       form = window.NelvoApplication.mount($("application-modal-body"), { service: requestedService });
+      motion($("application-modal-body"), [{ opacity: 0, transform: "translateY(18px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 420 });
     } finally { clearTimeout(timer); }
   }
   async function openForm(link) {
+    if (closing) await closing;
     opener = link; requestedService = new URL(link.href, location.href).searchParams.get("servico");
     $("application-modal-error").hidden = true;
     if (!modal.open) modal.showModal();
@@ -54,7 +87,8 @@
     if (path.pathname !== "/aplicar" || path.origin !== location.origin) return;
     event.preventDefault(); openForm(link);
   });
-  $("application-modal-close").addEventListener("click", () => modal.close());
+  $("application-modal-close").addEventListener("click", closeForm);
+  modal.addEventListener("cancel", event => { event.preventDefault(); closeForm(); });
   modal.addEventListener("keydown", (event) => {
     if (event.key !== "Tab") return;
     const focusable = [...modal.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
@@ -65,7 +99,7 @@
   });
   modal.addEventListener("click", (event) => {
     const rect = modal.getBoundingClientRect();
-    if (event.target === modal && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) modal.close();
+    if (event.target === modal && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) closeForm();
   });
   modal.addEventListener("close", () => { document.body.classList.remove("modal-open"); opener?.focus({ preventScroll: true }); });
 
@@ -121,6 +155,7 @@
   function resumeFilm() { if (!userPaused && !reduced.matches && !document.hidden) { automaticPause = false; film.play().catch(() => {}); } }
   document.body.classList.add("motion-ready");
   function updatePreference() {
+    if (reduced.matches) for (const animation of animations) animation.cancel();
     if (navigation) window.scrollTo({ top: window.scrollY, behavior: "instant" });
     document.body.classList.toggle("motion-reduced", reduced.matches);
     document.body.classList.toggle("short-viewport", compactHeight.matches);
@@ -152,5 +187,77 @@
     filmScene.style.setProperty("--pointer-y", ((event.clientY - rect.top) / rect.height - .5) * 8 + "px");
   });
   filmScene.addEventListener("pointerleave", () => { filmScene.style.setProperty("--pointer-x", "0px"); filmScene.style.setProperty("--pointer-y", "0px"); });
+  // Feedback também para cliques de teclado; os efeitos nunca bloqueiam a ação.
+  document.addEventListener("click", event => {
+    const target = event.target.closest(".cta,.service-link,.plain-link,.theme-toggle,.menu-toggle,.service-tabs button,.application-modal button,.site-header nav>a,.site-footer a:not(.nelvo-logo),.faq-list summary");
+    if (!target || target.disabled || reduced.matches) return;
+    motion(target, [{ scale: .96 }, { scale: 1 }], { duration: 310 });
+    if (target.matches(".service-tabs button,.faq-list summary")) return;
+    const wave = document.createElement("span"); wave.className = "click-wave"; wave.setAttribute("aria-hidden", "true");
+    const box = target.getBoundingClientRect(), size = Math.max(box.width, box.height) * 2;
+    wave.style.width = wave.style.height = size + "px";
+    wave.style.left = (event.detail ? event.clientX - box.left : box.width / 2) + "px";
+    wave.style.top = (event.detail ? event.clientY - box.top : box.height / 2) + "px";
+    target.classList.add("interaction-target"); target.append(wave);
+    const animation = motion(wave, [{ opacity: .32, transform: "translate(-50%,-50%) scale(0)" }, { opacity: 0, transform: "translate(-50%,-50%) scale(1)" }], { duration: 600 });
+    if (animation) animation.finished.catch(() => {}).finally(() => wave.remove()); else wave.remove();
+  });
+  document.addEventListener("click", event => {
+    const link = event.target.closest('a[href^="#"],a.nelvo-logo[href="/"]');
+    if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    if (link.classList.contains("nelvo-logo")) {
+      event.preventDefault(); window.scrollTo({ top: 0, behavior: reduced.matches ? "instant" : "smooth" });
+      if (location.hash) history.pushState(null, "", "/");
+      return;
+    }
+    const target = document.getElementById(link.hash.slice(1)); if (!target) return;
+    event.preventDefault();
+    const offset = document.querySelector(".site-header").offsetHeight + 22;
+    window.scrollTo({ top: target.getBoundingClientRect().top + scrollY - offset, behavior: reduced.matches ? "instant" : "smooth" });
+    if (location.hash !== link.hash) history.pushState(null, "", link.hash);
+    target.classList.remove("section-arriving");
+    requestAnimationFrame(() => target.classList.add("section-arriving"));
+    if (event.detail === 0) { target.tabIndex = -1; target.focus({ preventScroll: true }); }
+  });
+  // A abertura/fechamento das dúvidas acompanha a altura real da resposta.
+  const accordions = new WeakMap();
+  document.querySelectorAll(".faq-list details").forEach(detail => {
+    detail.querySelector("summary").addEventListener("click", event => {
+      if (reduced.matches) return;
+      event.preventDefault();
+      const previous = accordions.get(detail), expanded = !(previous ? previous.expanded : detail.open);
+      const start = detail.getBoundingClientRect().height;
+      previous?.animation.cancel(); detail.open = true;
+      const style = getComputedStyle(detail), summary = detail.querySelector("summary");
+      const end = expanded ? detail.scrollHeight + parseFloat(style.borderBottomWidth) : summary.getBoundingClientRect().height + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + parseFloat(style.borderBottomWidth);
+      const animation = motion(detail, [{ height: start + "px" }, { height: end + "px" }], { duration: 340 });
+      if (!animation) { detail.open = expanded; return; }
+      accordions.set(detail, { animation, expanded });
+      const settle = () => { if (accordions.get(detail)?.animation === animation) { detail.open = expanded; accordions.delete(detail); } };
+      animation.finished.then(settle, settle);
+    });
+  });
+  panels.forEach(panel => {
+    const demo = panel.querySelector(".service-demo");
+    demo.addEventListener("pointermove", event => {
+      if (reduced.matches || !matchMedia("(pointer:fine)").matches) return;
+      const box = demo.getBoundingClientRect();
+      demo.style.setProperty("--tilt-x", ((event.clientY - box.top) / box.height - .5) * -4 + "deg");
+      demo.style.setProperty("--tilt-y", ((event.clientX - box.left) / box.width - .5) * 4 + "deg");
+    });
+    demo.addEventListener("pointerleave", () => { demo.style.setProperty("--tilt-x", "0deg"); demo.style.setProperty("--tilt-y", "0deg"); });
+  });
+  const sectionObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) {
+        nav.querySelectorAll('a[aria-current="location"]').forEach(link => { if (link.hash === "#" + entry.target.id) link.removeAttribute("aria-current"); });
+        return;
+      }
+      nav.querySelectorAll('a[href^="#"]').forEach(link => {
+        if (link.hash === "#" + entry.target.id) link.setAttribute("aria-current", "location"); else link.removeAttribute("aria-current");
+      });
+    });
+  }, { rootMargin: "-15% 0px -65% 0px" });
+  document.querySelectorAll("#solucoes,#como-funciona,#sobre,#duvidas").forEach(section => sectionObserver.observe(section));
   setService(0); updatePreference();
 })();
