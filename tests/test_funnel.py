@@ -62,7 +62,7 @@ class FunnelTests(unittest.TestCase):
         self.assertEqual(logo.headers["content-type"], "image/png")
         self.assertTrue(logo.content.startswith(b"\x89PNG"))
         self.assertIn("Accept", html.headers["vary"])
-        self.assertEqual(self.client.get("/").json()["versao"], "0.10.0")
+        self.assertEqual(self.client.get("/").json()["versao"], "0.10.1")
 
     def test_public_submission_stores_application_without_customer_or_outreach(self):
         body = application(); identifier = self.submit(body)

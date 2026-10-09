@@ -112,19 +112,7 @@
     });
   });
   const film = $("nelvo-film");
-  const sound = $("film-sound");
-  function updateSound() {
-    const audible = !film.muted && film.volume > 0;
-    film.loop = !audible;
-    sound.setAttribute("aria-pressed", String(audible));
-    $("film-sound-label").textContent = audible ? "Silenciar" : "Ativar som";
-  }
-  sound.addEventListener("click", () => {
-    if (film.muted || film.volume === 0) { film.currentTime = 0; film.muted = false; film.volume = .8; film.play().catch(() => {}); }
-    else film.muted = true;
-    updateSound();
-  });
-  film.addEventListener("volumechange", updateSound);
+  film.addEventListener("volumechange", () => { film.loop = film.muted || film.volume === 0; });
   let userPaused = false, automaticPause = false;
   film.addEventListener("pause", () => { if (!automaticPause && !film.ended) userPaused = true; });
   film.addEventListener("play", () => { userPaused = false; automaticPause = false; });
