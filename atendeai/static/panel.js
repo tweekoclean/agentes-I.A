@@ -211,6 +211,12 @@
     for (const name of ["dashboard", "research", "funnel", "commercial", "inbox", "knowledge", "settings"]) $("view-" + name).hidden = name !== view;
     renderOverview();
     inlineError("load-error");
+    const completeLoading = window.NelvoLoading?.begin();
+    const section = $("view-" + view);
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches && section.animate) {
+      section.getAnimations().forEach(animation => animation.cancel());
+      section.animate([{ opacity: .2, transform: "translateY(14px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" });
+    }
     try {
       if (view === "dashboard") { await loadDashboard(); return; }
       if (view === "research") { await loadCatalog(); await loadLeads(); return; }
@@ -221,6 +227,7 @@
       else if (view === "knowledge") await loadKnowledge();
       else renderSettings();
     } catch (error) { if (error.name !== "AbortError") inlineError("load-error", error.message); }
+    finally { completeLoading?.(); }
   }
   async function loadQueue() {
     const filter = $("queue-filter").value;

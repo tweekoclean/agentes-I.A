@@ -1,4 +1,4 @@
-# Nelvo Company — soluções digitais e central comercial, versão 0.11.0
+# Nelvo Company — soluções digitais e central comercial, versão 0.12.0
 
 **A Nelvo Company oferece criação de sites, sistemas sob medida, reformulação de sites e atendimento com IA.** Os sistemas 1 (pesquisa) e 2 (abordagem comercial) são usados na operação interna; o sistema 3 é o serviço implantado nas empresas clientes. Consulte [PRODUTO.md](PRODUTO.md) para os fluxos do atendimento.
 
@@ -13,6 +13,8 @@ Plataforma organizada em três módulos:
 Os três agentes usam um modelo aberto hospedado por você, com instruções e permissões distintas. Não fazem chamadas à OpenAI. Veja [IA-LOCAL.md](IA-LOCAL.md) para ativar o Qwen3 na Square Cloud e controlar memória e capacidade. Esta versão inclui os três módulos. O atendimento tem uma base de respostas e conversas por empresa; o WhatsApp usa as credenciais da conta de cada cliente.
 
 Abra [a demonstração do atendimento no site](https://nelvo.squareweb.app/demonstracao) para testar as respostas da base e o encaminhamento. O chat usa o modelo local quando a IA está habilitada para a empresa de demonstração; ele não conecta um número WhatsApp.
+
+A home inclui a logo transparente com N único, vídeo narrado em Full HD, imagens ilustrativas adicionais e transições de carregamento. A tela inicial aguarda apenas a marca, com limite de quatro segundos; vídeos e imagens abaixo da dobra não bloqueiam a navegação. Os efeitos respeitam a preferência por movimento reduzido.
 
 ## Central da Nelvo e funil de aplicação
 

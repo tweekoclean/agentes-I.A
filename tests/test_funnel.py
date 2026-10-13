@@ -37,7 +37,7 @@ class FunnelTests(unittest.TestCase):
         return response.json()["protocolo"]
 
     def test_public_form_and_browser_root_with_api_compatibility(self):
-        for path in ("/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.svg", "/home/home.css", "/home/home.js", "/home/tema.js"):
+        for path in ("/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.svg", "/home/home.css", "/home/home.js", "/home/tema.js", "/home/carregamento.js", "/home/carregamento.css"):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertNotIn(KEY, response.text)
@@ -62,7 +62,7 @@ class FunnelTests(unittest.TestCase):
         self.assertEqual(logo.headers["content-type"], "image/png")
         self.assertTrue(logo.content.startswith(b"\x89PNG"))
         self.assertIn("Accept", html.headers["vary"])
-        self.assertEqual(self.client.get("/").json()["versao"], "0.11.0")
+        self.assertEqual(self.client.get("/").json()["versao"], "0.12.0")
 
     def test_public_submission_stores_application_without_customer_or_outreach(self):
         body = application(); identifier = self.submit(body)
@@ -87,6 +87,10 @@ class FunnelTests(unittest.TestCase):
         partial = self.client.get("/home/visuais/nelvo-intro.mp4", headers={"Range": "bytes=0-31"})
         self.assertEqual(partial.status_code, 206)
         self.assertEqual(partial.content, video.content[:32])
+        for name in ("nelvo-sales.webp", "nelvo-digital.webp"):
+            visual = self.client.get("/home/visuais/" + name, headers={"Range": "bytes=0-31"})
+            self.assertEqual(visual.status_code, 206)
+            self.assertEqual(visual.headers["content-type"], "image/webp")
         self.assertEqual(self.client.get("/home/visuais/application-form.html").status_code, 404)
         captions = self.client.get("/home/visuais/nelvo-intro.vtt")
         self.assertEqual(captions.status_code, 200)

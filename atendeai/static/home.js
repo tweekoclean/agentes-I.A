@@ -48,6 +48,7 @@
     return closing;
   }
   async function loadForm() {
+    const completeLoading = window.NelvoLoading?.begin();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
@@ -58,7 +59,7 @@
       $("application-modal-body").replaceChildren(document.importNode(fragment, true));
       form = window.NelvoApplication.mount($("application-modal-body"), { service: requestedService });
       motion($("application-modal-body"), [{ opacity: 0, transform: "translateY(18px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 420 });
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); completeLoading?.(); }
   }
   async function openForm(link) {
     if (closing) await closing;
@@ -113,14 +114,22 @@
     active = index;
     tabs.forEach((tab, i) => { if (i === index) tab.setAttribute("aria-current", "step"); else tab.removeAttribute("aria-current"); });
     panels.forEach((panel, i) => { panel.classList.toggle("is-active", i === index); panel.classList.toggle("is-past", i < index); });
+    motion(panels[index].querySelector(".service-copy"), [{ opacity: .35, transform: "translateY(14px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 520 });
   }
   function stickyTop() { return parseFloat(getComputedStyle(panels[0]).top) || 110; }
   function updateScroll() {
     queued = false;
+    const range = document.documentElement.scrollHeight - innerHeight;
+    document.documentElement.style.setProperty("--reading-progress", (range > 0 ? Math.min(1, Math.max(0, scrollY / range)) : 0).toFixed(4));
     const gallery = document.querySelector(".studio-showcase img");
     if (gallery && !reduced.matches) {
       const rect = gallery.getBoundingClientRect();
       if (rect.bottom > 0 && rect.top < innerHeight) gallery.style.setProperty("--image-y", Math.max(-14, Math.min(14, (innerHeight / 2 - rect.top) * .025)) + "px");
+    }
+    for (const image of document.querySelectorAll(".visual-picture img")) {
+      const rect = image.getBoundingClientRect();
+      if (!reduced.matches && rect.bottom > 0 && rect.top < innerHeight) image.style.setProperty("--image-y", Math.max(-12, Math.min(12, (innerHeight / 2 - rect.top) * .02)) + "px");
+      else if (reduced.matches) image.style.removeProperty("--image-y");
     }
     if (navigation && Math.abs(window.scrollY - navigation.top) > 4 && performance.now() < navigation.until) return;
     navigation = null;
@@ -172,13 +181,22 @@
   document.addEventListener("visibilitychange", () => document.hidden ? pauseFilm() : resumeFilm());
   new IntersectionObserver((entries) => { for (const entry of entries) entry.isIntersecting ? resumeFilm() : pauseFilm(); }, { threshold: .1 }).observe(film);
   for (const event of ["wheel", "touchstart"]) window.addEventListener(event, () => { navigation = null; }, { passive: true });
-  const reveals = document.querySelectorAll(".hero-copy > *, .section-heading, .about-grid, .process-grid li, .faq-list details, .closing, .site-footer, .about-art, .studio-showcase");
+  const reveals = document.querySelectorAll(".hero-copy > *, .section-heading, .about-grid, .process-grid li, .faq-list details, .closing, .site-footer, .about-art, .studio-showcase, .visual-heading, .visual-card");
   const revealObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) if (entry.isIntersecting) { entry.target.classList.add("is-visible"); revealObserver.unobserve(entry.target); }
   }, { threshold: 0.12 });
   reveals.forEach((element) => { element.classList.add("scroll-reveal"); revealObserver.observe(element); });
   const motionObserver = new IntersectionObserver((entries) => { entries.forEach((entry) => entry.target.classList.toggle("in-view", entry.isIntersecting)); });
   motionObserver.observe(story); motionObserver.observe(document.querySelector(".hero")); motionObserver.observe(document.querySelector(".closing"));
+  document.querySelectorAll(".visual-card").forEach(card => {
+    motionObserver.observe(card);
+    card.addEventListener("pointermove", event => {
+      if (reduced.matches || !matchMedia("(pointer:fine)").matches) return;
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--spot-x", event.clientX - rect.left + "px");
+      card.style.setProperty("--spot-y", event.clientY - rect.top + "px");
+    });
+  });
   const filmScene = document.querySelector(".hero-film");
   filmScene.addEventListener("pointermove", event => {
     if (reduced.matches || !matchMedia("(pointer:fine)").matches) return;
@@ -189,7 +207,7 @@
   filmScene.addEventListener("pointerleave", () => { filmScene.style.setProperty("--pointer-x", "0px"); filmScene.style.setProperty("--pointer-y", "0px"); });
   // Feedback também para cliques de teclado; os efeitos nunca bloqueiam a ação.
   document.addEventListener("click", event => {
-    const target = event.target.closest(".cta,.service-link,.plain-link,.theme-toggle,.menu-toggle,.service-tabs button,.application-modal button,.site-header nav>a,.site-footer a:not(.nelvo-logo),.faq-list summary");
+    const target = event.target.closest(".cta,.service-link,.plain-link,.theme-toggle,.menu-toggle,.service-tabs button,.application-modal button,.site-header nav>a,.site-footer a:not(.nelvo-logo),.faq-list summary,.visual-card");
     if (!target || target.disabled || reduced.matches) return;
     motion(target, [{ scale: .96 }, { scale: 1 }], { duration: 310 });
     if (target.matches(".service-tabs button,.faq-list summary")) return;

@@ -27,18 +27,18 @@ jobs:
                   try:
                       response = client.get(base + "/")
                       response.raise_for_status()
-                      if response.json().get("versao") == "0.11.0":
+                      if response.json().get("versao") == "0.12.0":
                           break
                   except (httpx.HTTPError, ValueError):
                       pass
                   if attempt == 17:
-                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.11.0.")
+                      raise SystemExit("A aplicação ainda não respondeu com a versão 0.12.0.")
                   time.sleep(5)
               health = client.get(base + "/health")
               health.raise_for_status()
               assert health.json()["status"] == "ok"
-              print("Versão 0.11.0 publicada; banco conectado.")
-              for route in ("/painel", "/painel/painel.css", "/painel/painel.js", "/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.png", "/home/home.css", "/home/home.js", "/home/tema.js"):
+              print("Versão 0.12.0 publicada; banco conectado.")
+              for route in ("/painel", "/painel/painel.css", "/painel/painel.js", "/aplicar", "/aplicar/conteudo", "/aplicar/formulario.js", "/marca.png", "/home/home.css", "/home/home.js", "/home/tema.js", "/home/carregamento.js", "/home/carregamento.css"):
                   panel = client.get(base + route)
                   panel.raise_for_status()
                   assert panel.headers.get("cache-control") == "no-store"
@@ -61,7 +61,7 @@ jobs:
               video = client.get(base + "/home/visuais/nelvo-intro.mp4", headers={"Range": "bytes=0-31"})
               assert video.status_code == 206
               assert b"ftyp" in video.content
-              for asset in ("nelvo-poster.jpg", "nelvo-connected.png", "nelvo-studio.png"):
+              for asset in ("nelvo-poster.jpg", "nelvo-connected.png", "nelvo-studio.png", "nelvo-sales.webp", "nelvo-digital.webp"):
                   visual = client.get(base + "/home/visuais/" + asset, headers={"Range": "bytes=0-31"})
                   assert visual.status_code == 206
               captions = client.get(base + "/home/visuais/nelvo-intro.vtt")

@@ -24,4 +24,8 @@ body{line-height:1.6}h2{letter-spacing:-.5px}button,a,input,select,textarea{touc
 @media(max-width:520px){.service-options{grid-template-columns:1fr}.public-header{gap:15px}.public-header nav{gap:12px;flex-wrap:wrap}.public-header nav a{font-size:10px}.public-header .nelvo-logo{width:145px;height:45px}}
 
 /* A marca transparente acompanha o fundo; letras claras apenas na navegação escura. */
-.brand.logo-original{position:relative;background:transparent!important;border-radius:0!important;overflow:hidden}.brand.logo-original img{mix-blend-mode:normal}.brand.logo-original .logo-light{position:absolute;inset:0;clip-path:inset(0 0 0 32.5%);filter:brightness(0) invert(1);pointer-events:none}.sidebar .brand.logo-original>img:not(.logo-light){filter:none}
+.brand.logo-original{position:relative;background:transparent!important;border-radius:0!important;overflow:hidden}.brand.logo-original img{mix-blend-mode:normal}.brand.logo-original .logo-light{position:absolute;inset:0;clip-path:inset(0 0 0 35.8%);filter:brightness(0) invert(1);pointer-events:none}.sidebar .brand.logo-original>img:not(.logo-light){filter:none}
+
+/* Troca de área com continuidade visual e feedback da operação. */
+.nav-button{transition:background .2s,color .2s,transform .2s}.nav-button:hover{transform:translateX(3px)}.nav-button:active{transform:scale(.98)}.brand.logo-original .logo-light{object-fit:cover}
+@media(prefers-reduced-motion:reduce){.nav-button{transition:none}.nav-button:hover,.nav-button:active{transform:none}}
