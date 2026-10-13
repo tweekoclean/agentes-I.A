@@ -439,7 +439,9 @@
   $("company-select").addEventListener("change", guarded((event) => selectCompany(event.target.value)));
   for (const button of document.querySelectorAll(".nav-button")) button.addEventListener("click", guarded(() => showView(button.dataset.view)));
   $("refresh").addEventListener("click", guarded(async () => {
-    await loadCompanies(); renderOverview(); await showView(state.view);
+    const completeLoading = window.NelvoLoading?.begin();
+    try { await loadCompanies(); renderOverview(); await showView(state.view); }
+    finally { completeLoading?.(); }
   }));
   $("create-company").addEventListener("click", () => openCompany());
   $("create-first-company").addEventListener("click", () => openCompany());

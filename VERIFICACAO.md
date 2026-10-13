@@ -2,6 +2,16 @@
 
 Data: 8 de outubro de 2026 (UTC).
 
+## Logo no vídeo e carregamento — 13 de outubro de 2026
+
+O MP4 foi renderizado novamente com a logo transparente atual. O arquivo anterior ainda usava a composição de uma versão anterior, embora o site e o poster já tivessem sido atualizados. A nova apresentação mantém 45 segundos, 1920 × 1080, 30 quadros por segundo e a trilha AAC original. Os 1350 quadros foram decodificados sem erro; o SHA-256 do fluxo de áudio coincide com o da trilha fonte.
+
+O formulário mostra um único indicador de carregamento e volta a mostrá-lo quando o visitante tenta novamente após uma falha. A atualização do painel mostra progresso desde a primeira consulta. As letras brancas da logo ficam restritas à barra lateral escura, preservando o contraste na tela de entrada clara.
+
+Os 12 testes do funil passaram no Windows. O teste de navegador verifica computador e celular, incluindo falha seguida de nova tentativa com resposta atrasada, indicador visível e formulário sem duplicação. As capturas aguardam a tela de carregamento desaparecer antes de registrar a interface. A comparação do fragmento do formulário aceita as diferenças de fim de linha entre Windows e Linux.
+
+Na suíte completa local, três casos de IA dependem de afinidade de CPU ou criação de links simbólicos de Linux, indisponíveis neste Windows; seis casos de certificados exigem OpenSSL. O workflow do GitHub executa a suíte completa em Linux. O renderizador permite configurar `FFMPEG_BIN` e usa `PANEL_TEST_OUTPUT` ou o diretório temporário do sistema para os arquivos intermediários, preservando o MP4 anterior até concluir a codificação.
+
 ## Dúvidas do negócio e abuso na versão 0.5.6
 
 A classificação de abuso fica separada da classificação de assunto externo. Quando o modelo tenta ignorar uma consulta reconhecível sobre serviços presentes na própria base, o atendimento oferece a confirmação para chamar um responsável. Mensagens classificadas como abuso continuam sem resposta, inclusive quando mencionam serviços.

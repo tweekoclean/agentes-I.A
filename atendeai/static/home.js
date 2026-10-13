@@ -48,6 +48,11 @@
     return closing;
   }
   async function loadForm() {
+    const placeholder = document.createElement("p");
+    placeholder.className = "modal-loading";
+    placeholder.setAttribute("role", "status");
+    placeholder.textContent = "Preparando seu formulário…";
+    $("application-modal-body").replaceChildren(placeholder);
     const completeLoading = window.NelvoLoading?.begin();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);

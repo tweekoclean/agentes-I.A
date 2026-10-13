@@ -28,7 +28,12 @@ async function get(route, administrative = false) {
   assert.equal(response.status, 200, "GET " + route);
   return response.json();
 }
-async function visible(page, selector) { await page.locator(selector).first().waitFor({ state: "visible", timeout: 20000 }); }
+async function visible(page, selector) {
+  await page.locator(selector).first().waitFor({ state: "visible", timeout: 20000 });
+  if (await page.locator("#nelvo-loader").count()) {
+    await page.locator("#nelvo-loader").waitFor({ state: "hidden", timeout: 6000 });
+  }
+}
 async function noOverflow(page, label) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   assert.equal(overflow, false, label + " cabe na tela");
@@ -287,14 +292,26 @@ async function scrollService(page, index, label) {
   await applicant.screenshot({ path: path.join(output, "aplicacao-mobile.png"), fullPage: true });
   // Falha temporária: reabrir o fragmento mantém apenas uma instância do formulário.
   let unavailable = true;
-  await applicant.route("**/aplicar/conteudo", (route) => unavailable ? route.fulfill({ status: 503, body: "Indisponível" }) : route.continue());
+  let resumeForm;
+  const formReady = new Promise(resolve => { resumeForm = resolve; });
+  await applicant.route("**/aplicar/conteudo", async (route) => {
+    if (unavailable) return route.fulfill({ status: 503, body: "Indisponível" });
+    await formReady;
+    return route.continue();
+  });
   await applicant.goto(base + "/");
   await applicant.locator(".hero-actions .cta").click();
   await visible(applicant, '#application-modal button:has-text("Tentar novamente")');
   assert.equal(await applicant.locator('#application-modal a[data-standalone]').getAttribute("href"), "/aplicar");
   unavailable = false;
   await applicant.getByRole("button", { name: "Tentar novamente" }).click();
+  await visible(applicant, "#application-modal .modal-loading");
+  assert.equal(await applicant.locator("html").evaluate(el => el.classList.contains("nelvo-working")), true);
+  await applicant.screenshot({ path: path.join(output, "popup-carregando-mobile.png") });
+  resumeForm();
   await visible(applicant, "#apply-company");
+  assert.equal(await applicant.locator("html").evaluate(el => el.classList.contains("nelvo-working")), false);
+  assert.equal(new URL(applicant.url()).pathname, "/", "O popup não dispara uma saída de página");
   assert.equal(await applicant.locator("#public-application-form").count(), 1);
   await applicant.locator("#application-modal-close").click();
   // Conteúdo permanece acessível mesmo em uma tela estreita ou baixa.

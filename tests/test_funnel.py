@@ -54,7 +54,7 @@ class FunnelTests(unittest.TestCase):
         self.assertIn('id="services-story"', html.text)
         self.assertIn('id="public-application-form"', self.client.get("/aplicar").text)
         fragment = self.client.get("/aplicar/conteudo").text
-        self.assertIn(fragment, self.client.get("/aplicar").text)
+        self.assertIn(fragment.replace("\r\n", "\n"), self.client.get("/aplicar").text.replace("\r\n", "\n"))
         self.assertNotIn("<!--APPLICATION_FORM-->", self.client.get("/aplicar").text)
         self.assertEqual(fragment.count('id="public-application-form"'), 1)
         self.assertNotIn("SÃO PAULO", html.text + self.client.get("/aplicar").text)
